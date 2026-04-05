@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Silkie — Sign in</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"IBM Plex Sans"', 'ui-sans-serif', 'system-ui'],
+            mono: ['"IBM Plex Mono"', 'ui-monospace'],
+          },
+        },
+      },
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" />
+</head>
+<body class="h-full bg-slate-950 text-slate-200 font-sans antialiased flex flex-col items-center justify-center">
+
+  <div class="flex flex-col items-center gap-6">
+
+    <!-- Icon above card -->
+    <img src="../../assets/icon-1024.png" alt="Silkie" class="w-[130px] h-[130px] rounded-2xl shadow-xl" />
+
+    <!-- Card -->
+    <div class="w-80 bg-slate-900 border border-slate-800 rounded-xl p-8 flex flex-col items-center gap-6 shadow-2xl">
+
+      <div class="text-center space-y-1">
+        <h1 class="text-lg font-semibold text-slate-100">Sign in to Silkie</h1>
+        <p class="text-sm text-slate-500">Secure access to your devices</p>
+      </div>
+
+      <!-- UOA sign-in button -->
+      <!--
+        Server-side: redirect to
+          https://authentication.unlikeotherai.com/oauth/authorize
+            ?config_url=<UOA_CONFIG_URL>
+        UOA_CONFIG_URL and UOA_SHARED_SECRET must be set in .env (see .env.example).
+        The config_url endpoint is signed with UOA_SHARED_SECRET (HS256).
+      -->
+      <a
+        href="admin.html"
+        class="w-full flex items-center justify-center gap-3 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors"
+      >
+        Login / Sign up
+      </a>
+
+    </div>
+
+    <p class="text-xs text-slate-600">Made with love in Scotland &copy; 2026 <a href="https://unlikeotherai.com" class="text-slate-200 font-medium hover:text-white transition-colors">UnlikeOtherAI</a></p>
+
+  </div>
+
+</body>
+</html>

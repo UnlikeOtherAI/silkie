@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Silkie — Admin</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"IBM Plex Sans"', 'ui-sans-serif', 'system-ui'],
+            mono: ['"IBM Plex Mono"', 'ui-monospace'],
+          },
+        },
+      },
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" />
+  <style>
+    [x-cloak] { display: none !important; }
+    .status-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; }
+  </style>
+</head>
+<body class="h-full bg-slate-950 text-slate-200 font-sans antialiased">
+
+<div class="flex h-full">
+
+  <!-- Sidebar -->
+  <aside class="w-56 shrink-0 flex flex-col bg-slate-900 border-r border-slate-800">
+    <!-- Logo -->
+    <div class="h-14 flex items-center px-4 gap-2.5 border-b border-slate-800">
+      <img src="../../assets/icon-1024.png" alt="Silkie" class="w-7 h-7 rounded-md shrink-0" />
+      <span class="font-mono text-sm font-medium text-slate-100 tracking-tight">silkie</span>
+    </div>
+
+    <!-- Nav -->
+    <nav class="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+      <a href="#" onclick="showPage('overview')" id="nav-overview"   class="nav-item active-nav flex items-center gap-2.5 px-3 py-2 rounded text-sm">
+        <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        Overview
+      </a>
+      <a href="#" onclick="showPage('devices')" id="nav-devices" class="nav-item flex items-center gap-2.5 px-3 py-2 rounded text-sm">
+        <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M8 12h8M12 9v6"/></svg>
+        Devices
+      </a>
+      <a href="#" onclick="showPage('sessions')" id="nav-sessions" class="nav-item flex items-center gap-2.5 px-3 py-2 rounded text-sm">
+        <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>
+        Sessions
+      </a>
+      <a href="#" onclick="showPage('services')" id="nav-services" class="nav-item flex items-center gap-2.5 px-3 py-2 rounded text-sm">
+        <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        Services
+      </a>
+
+      <div class="pt-3 pb-1 px-3">
+        <span class="text-xs font-medium text-slate-500 uppercase tracking-wider">Ops</span>
+      </div>
+
+      <a href="#" onclick="showPage('relay')" id="nav-relay" class="nav-item flex items-center gap-2.5 px-3 py-2 rounded text-sm">
+        <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>
+        Relay
+      </a>
+      <a href="#" onclick="showPage('system')" id="nav-system" class="nav-item flex items-center gap-2.5 px-3 py-2 rounded text-sm">
+        <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/></svg>
+        System
+      </a>
+    </nav>
+
+    <!-- User footer -->
+    <div class="border-t border-slate-800 px-4 py-3">
+      <div class="flex items-center gap-2.5">
+        <div class="w-7 h-7 rounded-full bg-indigo-600 flex items-center justify-center text-xs font-semibold text-white shrink-0">A</div>
+        <div class="min-w-0">
+          <p class="text-xs font-medium text-slate-200 truncate">admin</p>
+          <p class="text-xs text-slate-500 truncate">owner</p>
+        </div>
+        <a href="login.html" class="ml-auto text-slate-500 hover:text-slate-300 shrink-0" title="Sign out">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+        </a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="flex-1 flex flex-col min-w-0 overflow-hidden">
+
+    <!-- Top bar -->
+    <header class="h-14 shrink-0 flex items-center justify-between px-6 border-b border-slate-800 bg-slate-900/60">
+      <div id="page-title" class="text-sm font-semibold text-slate-100">Overview</div>
+      <div class="flex items-center gap-3">
+        <span class="flex items-center gap-1.5 text-xs text-emerald-400">
+          <span class="status-dot bg-emerald-400"></span>
+          Operational
+        </span>
+        <span class="font-mono text-xs text-slate-500">v0.1.0-mvp</span>
+      </div>
+    </header>
+
+    <!-- Page content -->
+    <div class="flex-1 overflow-y-auto p-6">
+
+      <!-- ========== OVERVIEW ========== -->
+      <div id="page-overview" class="page space-y-6">
+
+        <!-- Stat cards -->
+        <div class="grid grid-cols-3 gap-4">
+          <div class="bg-slate-800 rounded-lg p-4 border border-slate-700">
+            <p class="text-xs text-slate-400 uppercase tracking-wider font-medium mb-2">Devices Online</p>
+            <p class="text-3xl font-semibold text-slate-100">3</p>
+            <p class="text-xs text-slate-500 mt-1">of 5 registered</p>
+          </div>
+          <div class="bg-slate-800 rounded-lg p-4 border border-slate-700">
+            <p class="text-xs text-slate-400 uppercase tracking-wider font-medium mb-2">Active Sessions</p>
+            <p class="text-3xl font-semibold text-slate-100">1</p>
+            <p class="text-xs text-slate-500 mt-1">0 via relay</p>
+          </div>
+          <div class="bg-slate-800 rounded-lg p-4 border border-slate-700">
+            <p class="text-xs text-slate-400 uppercase tracking-wider font-medium mb-2">Relay Rate</p>
+            <p class="text-3xl font-semibold text-slate-100">0%</p>
+            <p class="text-xs text-slate-500 mt-1">100% direct</p>
+          </div>
+        </div>
+
+        <!-- Recent sessions -->
+        <div class="bg-slate-800 rounded-lg border border-slate-700">
+          <div class="px-5 py-3.5 border-b border-slate-700 flex items-center justify-between">
+            <span class="text-sm font-semibold text-slate-100">Recent Sessions</span>
+            <a href="#" onclick="showPage('sessions')" class="text-xs text-indigo-400 hover:text-indigo-300">View all →</a>
+          </div>
+          <div class="divide-y divide-slate-700/60">
+            <div class="px-5 py-3 flex items-center gap-4 text-sm">
+              <span class="status-dot bg-emerald-400 shrink-0"></span>
+              <span class="text-slate-300 flex-1">macbook-pro → ssh:22</span>
+              <span class="text-xs text-emerald-400 font-medium">direct</span>
+              <span class="font-mono text-xs text-slate-500">opened 09:41:02</span>
+            </div>
+            <div class="px-5 py-3 flex items-center gap-4 text-sm">
+              <span class="status-dot bg-slate-600 shrink-0"></span>
+              <span class="text-slate-400 flex-1">homelab-server → http:8080</span>
+              <span class="text-xs text-slate-500">direct</span>
+              <span class="font-mono text-xs text-slate-600">closed 08:56:11 · 14m</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Device quick view -->
+        <div class="bg-slate-800 rounded-lg border border-slate-700">
+          <div class="px-5 py-3.5 border-b border-slate-700 flex items-center justify-between">
+            <span class="text-sm font-semibold text-slate-100">Devices</span>
+            <a href="#" onclick="showPage('devices')" class="text-xs text-indigo-400 hover:text-indigo-300">Manage →</a>
+          </div>
+          <div class="divide-y divide-slate-700/60">
+            <div class="px-5 py-3 flex items-center gap-4 text-sm">
+              <span class="status-dot bg-emerald-400 shrink-0"></span>
+              <span class="font-medium text-slate-200 w-40 shrink-0">macbook-pro</span>
+              <span class="text-slate-500 text-xs font-mono w-28 shrink-0">10.100.0.2</span>
+              <span class="text-slate-500 text-xs">darwin · agent 0.1.0</span>
+              <span class="ml-auto text-xs text-slate-500 font-mono">just now</span>
+            </div>
+            <div class="px-5 py-3 flex items-center gap-4 text-sm">
+              <span class="status-dot bg-emerald-400 shrink-0"></span>
+              <span class="font-medium text-slate-200 w-40 shrink-0">homelab-server</span>
+              <span class="text-slate-500 text-xs font-mono w-28 shrink-0">10.100.0.3</span>
+              <span class="text-slate-500 text-xs">linux · agent 0.1.0</span>
+              <span class="ml-auto text-xs text-slate-500 font-mono">2m ago</span>
+            </div>
+            <div class="px-5 py-3 flex items-center gap-4 text-sm">
+              <span class="status-dot bg-emerald-400 shrink-0"></span>
+              <span class="font-medium text-slate-200 w-40 shrink-0">nas</span>
+              <span class="text-slate-500 text-xs font-mono w-28 shrink-0">10.100.0.4</span>
+              <span class="text-slate-500 text-xs">linux · agent 0.1.0</span>
+              <span class="ml-auto text-xs text-slate-500 font-mono">5m ago</span>
+            </div>
+            <div class="px-5 py-3 flex items-center gap-4 text-sm">
+              <span class="status-dot bg-slate-600 shrink-0"></span>
+              <span class="font-medium text-slate-400 w-40 shrink-0">work-laptop</span>
+              <span class="text-slate-600 text-xs font-mono w-28 shrink-0">10.100.0.5</span>
+              <span class="text-slate-600 text-xs">darwin · agent 0.1.0</span>
+              <span class="ml-auto text-xs text-slate-600 font-mono">3h ago</span>
+            </div>
+            <div class="px-5 py-3 flex items-center gap-4 text-sm">
+              <span class="status-dot bg-amber-400 shrink-0"></span>
+              <span class="font-medium text-slate-400 w-40 shrink-0">rpi-4</span>
+              <span class="text-slate-500 text-xs font-mono w-28 shrink-0">10.100.0.6</span>
+              <span class="text-slate-500 text-xs">linux · agent 0.1.0</span>
+              <span class="ml-auto text-xs text-amber-500 font-mono text-xs">pending</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========== DEVICES ========== -->
+      <div id="page-devices" class="page hidden space-y-5">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <input id="device-search" type="text" placeholder="Search devices…" class="bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 w-64" />
+            <select id="device-status" class="bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-300 focus:outline-none focus:border-indigo-500">
+              <option value="">All statuses</option>
+              <option value="active">Online</option>
+              <option value="offline">Offline</option>
+              <option value="pending">Pending</option>
+              <option value="revoked">Revoked</option>
+            </select>
+          </div>
+          <button onclick="showPage('pair')" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-4 py-1.5 rounded transition-colors">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 4v16m8-8H4"/></svg>
+            Enrol Device
+          </button>
+        </div>
+        <div class="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-slate-700 text-xs text-slate-400 uppercase tracking-wider">
+                <th class="text-left px-5 py-3 font-medium">Device</th>
+                <th class="text-left px-4 py-3 font-medium">Status</th>
+                <th class="text-left px-4 py-3 font-medium">Overlay IP</th>
+                <th class="text-left px-4 py-3 font-medium">Platform</th>
+                <th class="text-left px-4 py-3 font-medium">WG Key</th>
+                <th class="text-left px-4 py-3 font-medium">Last Seen</th>
+                <th class="text-left px-4 py-3 font-medium"></th>
+              </tr>
+            </thead>
+            <tbody id="devices-body" class="divide-y divide-slate-700/60"></tbody>
+          </table>
+          <div id="devices-footer"></div>
+        </div>
+      </div>
+
+      <!-- ========== SESSIONS ========== -->
+      <div id="page-sessions" class="page hidden space-y-5">
+        <div class="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
+          <div class="px-5 py-3.5 border-b border-slate-700">
+            <span class="text-sm font-semibold text-slate-100">Active Sessions</span>
+          </div>
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-slate-700 text-xs text-slate-400 uppercase tracking-wider">
+                <th class="text-left px-5 py-3 font-medium">Session ID</th>
+                <th class="text-left px-4 py-3 font-medium">Device → Service</th>
+                <th class="text-left px-4 py-3 font-medium">Path</th>
+                <th class="text-left px-4 py-3 font-medium">Status</th>
+                <th class="text-left px-4 py-3 font-medium">Opened</th>
+                <th class="text-left px-4 py-3 font-medium">Expires</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="sessions-active-body" class="divide-y divide-slate-700/60"></tbody>
+          </table>
+          <div id="sessions-active-footer"></div>
+        </div>
+
+        <div class="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
+          <div class="px-5 py-3.5 border-b border-slate-700">
+            <span class="text-sm font-semibold text-slate-100">Closed Sessions</span>
+          </div>
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-slate-700 text-xs text-slate-400 uppercase tracking-wider">
+                <th class="text-left px-5 py-3 font-medium">Session ID</th>
+                <th class="text-left px-4 py-3 font-medium">Device → Service</th>
+                <th class="text-left px-4 py-3 font-medium">Path</th>
+                <th class="text-left px-4 py-3 font-medium">Duration</th>
+                <th class="text-left px-4 py-3 font-medium">Closed</th>
+              </tr>
+            </thead>
+            <tbody id="sessions-closed-body" class="divide-y divide-slate-700/60"></tbody>
+          </table>
+          <div id="sessions-closed-footer"></div>
+        </div>
+      </div>
+
+      <!-- ========== SERVICES ========== -->
+      <div id="page-services" class="page hidden space-y-5">
+        <div class="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
+          <div class="px-5 py-3.5 border-b border-slate-700 flex items-center justify-between">
+            <span class="text-sm font-semibold text-slate-100">Service Catalog</span>
+            <span class="text-xs text-slate-500">Reported by device agents on heartbeat</span>
+          </div>
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-slate-700 text-xs text-slate-400 uppercase tracking-wider">
+                <th class="text-left px-5 py-3 font-medium">Device</th>
+                <th class="text-left px-4 py-3 font-medium">Service</th>
+                <th class="text-left px-4 py-3 font-medium">Protocol</th>
+                <th class="text-left px-4 py-3 font-medium">Bind</th>
+                <th class="text-left px-4 py-3 font-medium">Exposed</th>
+                <th class="text-left px-4 py-3 font-medium">Health</th>
+              </tr>
+            </thead>
+            <tbody id="services-body" class="divide-y divide-slate-700/60"></tbody>
+          </table>
+          <div id="services-footer"></div>
+        </div>
+      </div>
+
+      <!-- ========== PAIR ========== -->
+      <div id="page-pair" class="page hidden space-y-6 max-w-xl">
+
+        <!-- Back -->
+        <button onclick="showPage('devices')" class="flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-200 transition-colors">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+          Back to Devices
+        </button>
+
+        <div>
+          <h2 class="text-base font-semibold text-slate-100">Enrol a Device</h2>
+          <p class="text-sm text-slate-500 mt-1">Choose how to link the new device to your account.</p>
+        </div>
+
+        <!-- Method 1: Pairing code -->
+        <div class="bg-slate-800 rounded-lg border border-slate-700 p-6 space-y-5">
+          <div>
+            <p class="text-sm font-semibold text-slate-100">Enter pairing code</p>
+            <p class="text-xs text-slate-500 mt-1">Run <code class="font-mono bg-slate-700 px-1 py-0.5 rounded">silkie enroll</code> on the device. It will display a 6-character code — enter it below.</p>
+          </div>
+
+          <!-- 6-char OTP input -->
+          <div class="flex gap-2" id="otp-boxes">
+            <input data-otp="0" type="text" maxlength="1" class="otp-cell w-12 h-14 text-center text-xl font-mono font-semibold bg-slate-900 border border-slate-600 rounded-lg text-slate-100 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors uppercase" />
+            <input data-otp="1" type="text" maxlength="1" class="otp-cell w-12 h-14 text-center text-xl font-mono font-semibold bg-slate-900 border border-slate-600 rounded-lg text-slate-100 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors uppercase" />
+            <input data-otp="2" type="text" maxlength="1" class="otp-cell w-12 h-14 text-center text-xl font-mono font-semibold bg-slate-900 border border-slate-600 rounded-lg text-slate-100 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors uppercase" />
+            <span class="flex items-center text-slate-600 select-none">—</span>
+            <input data-otp="3" type="text" maxlength="1" class="otp-cell w-12 h-14 text-center text-xl font-mono font-semibold bg-slate-900 border border-slate-600 rounded-lg text-slate-100 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors uppercase" />
+            <input data-otp="4" type="text" maxlength="1" class="otp-cell w-12 h-14 text-center text-xl font-mono font-semibold bg-slate-900 border border-slate-600 rounded-lg text-slate-100 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors uppercase" />
+            <input data-otp="5" type="text" maxlength="1" class="otp-cell w-12 h-14 text-center text-xl font-mono font-semibold bg-slate-900 border border-slate-600 rounded-lg text-slate-100 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors uppercase" />
+          </div>
+
+          <div id="pair-status" class="hidden text-sm"></div>
+
+          <button id="pair-submit" disabled class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed text-white text-sm font-medium px-4 py-2 rounded transition-colors">
+            Link device
+          </button>
+        </div>
+
+        <!-- Divider -->
+        <div class="flex items-center gap-3">
+          <div class="flex-1 border-t border-slate-800"></div>
+          <span class="text-xs text-slate-600">or</span>
+          <div class="flex-1 border-t border-slate-800"></div>
+        </div>
+
+        <!-- Method 2: CLI SSO -->
+        <div class="bg-slate-800 rounded-lg border border-slate-700 p-6 space-y-3">
+          <div>
+            <p class="text-sm font-semibold text-slate-100">SSO from the device</p>
+            <p class="text-xs text-slate-500 mt-1">If you're sitting at the machine, run the command below. A browser will open and the device will enrol automatically once you sign in.</p>
+          </div>
+          <div class="bg-slate-900 rounded-lg px-4 py-3 font-mono text-sm text-indigo-300 flex items-center justify-between">
+            <span>silkie enroll --sso</span>
+            <button onclick="navigator.clipboard.writeText('silkie enroll --sso')" class="text-slate-500 hover:text-slate-300 transition-colors ml-4 shrink-0" title="Copy">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+            </button>
+          </div>
+          <p class="text-xs text-slate-600">The CLI polls every 5 seconds and completes enrollment automatically after login.</p>
+        </div>
+
+      </div>
+
+      <!-- ========== RELAY ========== -->
+      <div id="page-relay" class="page hidden space-y-5">
+        <div class="grid grid-cols-3 gap-4">
+          <div class="bg-slate-800 rounded-lg p-4 border border-slate-700">
+            <p class="text-xs text-slate-400 uppercase tracking-wider font-medium mb-2">Relay (coturn)</p>
+            <div class="flex items-center gap-2">
+              <span class="status-dot bg-emerald-400"></span>
+              <span class="text-sm font-medium text-emerald-400">Running</span>
+            </div>
+            <p class="text-xs text-slate-500 mt-1 font-mono">turn.local:3478</p>
+          </div>
+          <div class="bg-slate-800 rounded-lg p-4 border border-slate-700">
+            <p class="text-xs text-slate-400 uppercase tracking-wider font-medium mb-2">Active Allocations</p>
+            <p class="text-3xl font-semibold text-slate-100">0</p>
+          </div>
+          <div class="bg-slate-800 rounded-lg p-4 border border-slate-700">
+            <p class="text-xs text-slate-400 uppercase tracking-wider font-medium mb-2">Total Relayed</p>
+            <p class="text-3xl font-semibold text-slate-100">0</p>
+            <p class="text-xs text-slate-500 mt-1">sessions this week</p>
+          </div>
+        </div>
+
+        <div class="bg-slate-800 rounded-lg border border-slate-700">
+          <div class="px-5 py-3.5 border-b border-slate-700">
+            <span class="text-sm font-semibold text-slate-100">Active Allocations</span>
+          </div>
+          <div class="px-5 py-10 text-center text-sm text-slate-600">
+            No active relay allocations — all sessions using direct paths
+          </div>
+        </div>
+      </div>
+
+      <!-- ========== SYSTEM ========== -->
+      <div id="page-system" class="page hidden space-y-5">
+        <div class="grid grid-cols-2 gap-4">
+          <!-- Health checks -->
+          <div class="bg-slate-800 rounded-lg border border-slate-700">
+            <div class="px-5 py-3.5 border-b border-slate-700">
+              <span class="text-sm font-semibold text-slate-100">Health Checks</span>
+            </div>
+            <div class="divide-y divide-slate-700/60">
+              <div class="px-5 py-3 flex items-center justify-between text-sm">
+                <span class="text-slate-300">Control API</span>
+                <span class="flex items-center gap-1.5 text-emerald-400 text-xs"><span class="status-dot bg-emerald-400"></span>ok</span>
+              </div>
+              <div class="px-5 py-3 flex items-center justify-between text-sm">
+                <span class="text-slate-300">PostgreSQL</span>
+                <span class="flex items-center gap-1.5 text-emerald-400 text-xs"><span class="status-dot bg-emerald-400"></span>ok</span>
+              </div>
+              <div class="px-5 py-3 flex items-center justify-between text-sm">
+                <span class="text-slate-300">Redis</span>
+                <span class="flex items-center gap-1.5 text-emerald-400 text-xs"><span class="status-dot bg-emerald-400"></span>ok</span>
+              </div>
+              <div class="px-5 py-3 flex items-center justify-between text-sm">
+                <span class="text-slate-300">coturn (TURN)</span>
+                <span class="flex items-center gap-1.5 text-emerald-400 text-xs"><span class="status-dot bg-emerald-400"></span>ok</span>
+              </div>
+              <div class="px-5 py-3 flex items-center justify-between text-sm">
+                <span class="text-slate-300">OTel exporter</span>
+                <span class="flex items-center gap-1.5 text-slate-400 text-xs"><span class="status-dot bg-slate-500"></span>no-op</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Version / migrations -->
+          <div class="bg-slate-800 rounded-lg border border-slate-700">
+            <div class="px-5 py-3.5 border-b border-slate-700">
+              <span class="text-sm font-semibold text-slate-100">Version & Migrations</span>
+            </div>
+            <div class="divide-y divide-slate-700/60">
+              <div class="px-5 py-3 flex items-center justify-between text-sm">
+                <span class="text-slate-400">Server version</span>
+                <span class="font-mono text-xs text-slate-300">v0.1.0-mvp</span>
+              </div>
+              <div class="px-5 py-3 flex items-center justify-between text-sm">
+                <span class="text-slate-400">Schema version</span>
+                <span class="font-mono text-xs text-slate-300">4 / 4</span>
+              </div>
+              <div class="px-5 py-3 flex items-center justify-between text-sm">
+                <span class="text-slate-400">Migration status</span>
+                <span class="text-xs text-emerald-400">up to date</span>
+              </div>
+              <div class="px-5 py-3 flex items-center justify-between text-sm">
+                <span class="text-slate-400">Go runtime</span>
+                <span class="font-mono text-xs text-slate-300">go1.23.4</span>
+              </div>
+              <div class="px-5 py-3 flex items-center justify-between text-sm">
+                <span class="text-slate-400">Uptime</span>
+                <span class="font-mono text-xs text-slate-300">1h 28m</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Metrics summary -->
+        <div class="bg-slate-800 rounded-lg border border-slate-700">
+          <div class="px-5 py-3.5 border-b border-slate-700 flex items-center justify-between">
+            <span class="text-sm font-semibold text-slate-100">Key Metrics</span>
+            <a href="#" class="text-xs text-indigo-400 hover:text-indigo-300 font-mono">/metrics →</a>
+          </div>
+          <div class="grid grid-cols-4 divide-x divide-slate-700">
+            <div class="px-5 py-4">
+              <p class="text-xs text-slate-500 mb-1">remote_active_devices</p>
+              <p class="text-2xl font-semibold text-slate-100">3</p>
+            </div>
+            <div class="px-5 py-4">
+              <p class="text-xs text-slate-500 mb-1">remote_active_sessions</p>
+              <p class="text-2xl font-semibold text-slate-100">1</p>
+            </div>
+            <div class="px-5 py-4">
+              <p class="text-xs text-slate-500 mb-1">remote_direct_connect_ratio</p>
+              <p class="text-2xl font-semibold text-slate-100">100%</p>
+            </div>
+            <div class="px-5 py-4">
+              <p class="text-xs text-slate-500 mb-1">remote_auth_failures_total</p>
+              <p class="text-2xl font-semibold text-slate-100">0</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Danger zone -->
+        <div class="bg-slate-800 rounded-lg border border-red-900/40">
+          <div class="px-5 py-3.5 border-b border-red-900/40">
+            <span class="text-sm font-semibold text-red-400">Danger Zone</span>
+          </div>
+          <div class="px-5 py-4 flex items-center justify-between">
+            <div>
+              <p class="text-sm text-slate-300">Terminate all sessions</p>
+              <p class="text-xs text-slate-500 mt-0.5">Immediately close every active session and invalidate credentials</p>
+            </div>
+            <button class="text-xs font-medium text-red-400 border border-red-900 hover:border-red-700 hover:bg-red-950 px-3 py-1.5 rounded transition-colors">
+              Terminate all
+            </button>
+          </div>
+          <div class="px-5 py-4 flex items-center justify-between border-t border-red-900/40">
+            <div>
+              <p class="text-sm text-slate-300">Revoke all device registrations</p>
+              <p class="text-xs text-slate-500 mt-0.5">All devices will need to re-enroll with new bootstrap tokens</p>
+            </div>
+            <button class="text-xs font-medium text-red-400 border border-red-900 hover:border-red-700 hover:bg-red-950 px-3 py-1.5 rounded transition-colors">
+              Revoke all devices
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <footer class="shrink-0 border-t border-slate-800 px-6 py-3 flex items-center justify-center">
+      <p class="text-xs text-slate-600">Made with love in Scotland &copy; 2026 <a href="https://unlikeotherai.com" class="text-slate-200 font-medium hover:text-white transition-colors">UnlikeOtherAI</a></p>
+    </footer>
+  </main>
+</div>
+
+<style>
+  .nav-item { color: #94a3b8; transition: background-color 0.12s, color 0.12s; }
+  .nav-item:hover { background-color: rgb(51 65 85 / 0.5); color: #e2e8f0; }
+  .active-nav { background-color: rgb(51 65 85 / 0.7); color: #e2e8f0; }
+</style>
+
+<script>
+  // ── Page switching ───────────────────────────────────────────────────────────
+  const pages = ['overview', 'devices', 'sessions', 'services', 'relay', 'system', 'pair'];
+  const titles = {
+    overview: 'Overview', devices: 'Devices', sessions: 'Sessions',
+    services: 'Service Catalog', relay: 'Relay', system: 'System', pair: 'Enrol Device',
+  };
+  function showPage(name) {
+    pages.forEach(p => {
+      document.getElementById('page-' + p).classList.toggle('hidden', p !== name);
+      const nav = document.getElementById('nav-' + p);
+      if (nav) nav.classList.toggle('active-nav', p === name);
+    });
+    document.getElementById('page-title').textContent = titles[name] || name;
+    return false;
+  }
+
+  // ── DOM helpers ──────────────────────────────────────────────────────────────
+  function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined) e.textContent = text;
+    return e;
+  }
+  function td(cls, text) { return el('td', cls, text); }
+  function span(cls, text) { return el('span', cls, text); }
+
+  // ── Paginator ────────────────────────────────────────────────────────────────
+  class Paginator {
+    constructor({ bodyId, footerId, pageSize = 10, createRow, emptyMessage = 'No records' }) {
+      this.body   = document.getElementById(bodyId);
+      this.footer = document.getElementById(footerId);
+      this.pageSize = pageSize;
+      this.createRow = createRow;
+      this.emptyMessage = emptyMessage;
+      this.data = [];
+      this.page = 1;
+    }
+    setData(data) { this.data = data; this.page = 1; this.render(); }
+    render() {
+      const total = this.data.length;
+      const pages = Math.max(1, Math.ceil(total / this.pageSize));
+      this.page = Math.min(this.page, pages);
+      const start = (this.page - 1) * this.pageSize;
+      const slice = this.data.slice(start, start + this.pageSize);
+
+      this.body.replaceChildren();
+      if (slice.length === 0) {
+        const row = el('tr'); const cell = td('px-5 py-10 text-center text-sm text-slate-600', this.emptyMessage);
+        cell.colSpan = 99; row.appendChild(cell); this.body.appendChild(row);
+      } else {
+        slice.forEach(item => this.body.appendChild(this.createRow(item)));
+      }
+
+      this.footer.replaceChildren();
+      if (total > this.pageSize) this.footer.appendChild(this._buildFooter(start + 1, start + slice.length, total, pages));
+    }
+    goTo(p) { this.page = p; this.render(); }
+    _buildFooter(from, to, total, pages) {
+      const wrap = el('div', 'px-5 py-3 flex items-center justify-between border-t border-slate-700/60');
+      const info = el('span', 'text-xs text-slate-500');
+      info.textContent = `Showing ${from}–${to} of ${total}`;
+      const controls = el('div', 'flex items-center gap-2');
+      const mkBtn = (label, enabled, onClick) => {
+        const b = el('button', `px-2.5 py-1 rounded text-xs border transition-colors ${enabled ? 'text-slate-300 border-slate-700 hover:bg-slate-700 hover:border-slate-600' : 'text-slate-600 border-slate-800 cursor-not-allowed'}`);
+        b.textContent = label;
+        b.disabled = !enabled;
+        if (enabled) b.addEventListener('click', onClick);
+        return b;
+      };
+      const pageLabel = el('span', 'text-xs text-slate-500 tabular-nums', `${this.page} / ${pages}`);
+      controls.append(
+        mkBtn('← Prev', this.page > 1,      () => this.goTo(this.page - 1)),
+        pageLabel,
+        mkBtn('Next →', this.page < pages,  () => this.goTo(this.page + 1))
+      );
+      wrap.append(info, controls);
+      return wrap;
+    }
+  }
+
+  // ── Mock data ────────────────────────────────────────────────────────────────
+  const DEVICES = [
+    { name:'macbook-pro',      id:'dev-9f3a1b2c', status:'active',  ip:'10.100.0.2',  platform:'darwin / arm64',  key:'qW3x…Kp2=', seen:'just now' },
+    { name:'homelab-server',   id:'dev-4d8e2c7f', status:'active',  ip:'10.100.0.3',  platform:'linux / amd64',   key:'mN7z…Rq8=', seen:'2m ago' },
+    { name:'nas',              id:'dev-1a5b9e4d', status:'active',  ip:'10.100.0.4',  platform:'linux / amd64',   key:'pL1k…Vw5=', seen:'5m ago' },
+    { name:'work-laptop',      id:'dev-7c2d5f8a', status:'offline', ip:'10.100.0.5',  platform:'darwin / amd64',  key:'tB4j…Hn9=', seen:'3h ago' },
+    { name:'rpi-4',            id:'dev-3e6f0d1b', status:'pending', ip:'—',           platform:'linux / arm64',   key:'—',         seen:'enrolling…' },
+    { name:'dev-box',          id:'dev-6b0c4a2e', status:'active',  ip:'10.100.0.7',  platform:'linux / amd64',   key:'xZ9q…Lm3=', seen:'12m ago' },
+    { name:'gaming-pc',        id:'dev-2e8d7c1f', status:'offline', ip:'10.100.0.8',  platform:'windows / amd64', key:'vK2m…Dp7=', seen:'1d ago' },
+    { name:'ipad-pro',         id:'dev-5f1a3e9b', status:'offline', ip:'10.100.0.9',  platform:'ios / arm64',     key:'nP5r…Wc1=', seen:'2d ago' },
+    { name:'office-mac',       id:'dev-8c4b2f0d', status:'active',  ip:'10.100.0.10', platform:'darwin / arm64',  key:'hY8t…Jk4=', seen:'34m ago' },
+    { name:'vpn-gateway',      id:'dev-0d7e5c3a', status:'active',  ip:'10.100.0.11', platform:'linux / amd64',   key:'fR3w…Qs6=', seen:'1m ago' },
+    { name:'media-server',     id:'dev-7a2f9d4c', status:'active',  ip:'10.100.0.12', platform:'linux / amd64',   key:'bU6y…Nt2=', seen:'8m ago' },
+    { name:'old-mbp',          id:'dev-4e1b8a5f', status:'revoked', ip:'10.100.0.13', platform:'darwin / amd64',  key:'—',         seen:'14d ago' },
+    { name:'cloud-relay',      id:'dev-1c6d3f8e', status:'active',  ip:'10.100.0.14', platform:'linux / amd64',   key:'gX7v…Rc5=', seen:'just now' },
+    { name:'backup-server',    id:'dev-9b4a2e7c', status:'offline', ip:'10.100.0.15', platform:'linux / amd64',   key:'jM4s…Pw9=', seen:'6h ago' },
+    { name:'rpi-zero',         id:'dev-3f8c1b5e', status:'pending', ip:'—',           platform:'linux / arm64',   key:'—',         seen:'enrolling…' },
+    { name:'test-vm',          id:'dev-6e3d0a9f', status:'active',  ip:'10.100.0.17', platform:'linux / amd64',   key:'kA1n…Ux8=', seen:'22m ago' },
+    { name:'pi-hole',          id:'dev-2b9f7c4e', status:'active',  ip:'10.100.0.18', platform:'linux / arm64',   key:'lB2o…Vy7=', seen:'3m ago' },
+  ];
+
+  const SESSIONS_ACTIVE = [
+    { id:'ses-8f2a4d1c', target:'macbook-pro → ssh:22',       path:'direct', status:'established', opened:'09:41:02', expires:'10:41:02' },
+    { id:'ses-3c1e9b7a', target:'homelab-server → http:8080', path:'direct', status:'established', opened:'09:38:14', expires:'10:38:14' },
+    { id:'ses-5d0f2c8b', target:'nas → smb:445',              path:'relay',  status:'established', opened:'09:35:01', expires:'10:35:01' },
+  ];
+
+  const SESSIONS_CLOSED = [
+    { id:'ses-2d7c1e9f', target:'homelab-server → http:8080', path:'direct', duration:'14m 32s', closed:'2026-04-05 08:56:11' },
+    { id:'ses-6a4b3f1c', target:'macbook-pro → ssh:22',       path:'direct', duration:'1h 02m',  closed:'2026-04-05 07:44:08' },
+    { id:'ses-1e8d5a3b', target:'nas → smb:445',              path:'relay',  duration:'3m 18s',  closed:'2026-04-04 23:12:55' },
+    { id:'ses-9c2f7b4e', target:'vpn-gateway → ssh:22',       path:'direct', duration:'28m 04s', closed:'2026-04-04 22:05:33' },
+    { id:'ses-4a6e1d8f', target:'media-server → http:32400',  path:'direct', duration:'55m 11s', closed:'2026-04-04 21:30:47' },
+    { id:'ses-7b3c0a5d', target:'dev-box → ssh:22',           path:'direct', duration:'8m 49s',  closed:'2026-04-04 19:21:16' },
+    { id:'ses-0f5d2e9c', target:'homelab-server → ssh:22',    path:'direct', duration:'2m 03s',  closed:'2026-04-04 18:10:02' },
+    { id:'ses-8e1a6b4f', target:'macbook-pro → ssh:22',       path:'direct', duration:'4h 17m',  closed:'2026-04-04 14:58:30' },
+    { id:'ses-3d7f4c2a', target:'nas → smb:445',              path:'relay',  duration:'6m 55s',  closed:'2026-04-04 12:43:19' },
+    { id:'ses-5a9c1e6b', target:'office-mac → ssh:22',        path:'direct', duration:'19m 22s', closed:'2026-04-04 11:02:44' },
+    { id:'ses-2f4b8d0e', target:'pi-hole → http:80',          path:'direct', duration:'1m 08s',  closed:'2026-04-04 10:15:37' },
+    { id:'ses-6c0e3a7f', target:'cloud-relay → ssh:22',       path:'direct', duration:'33m 50s', closed:'2026-04-03 22:48:05' },
+  ];
+
+  const SERVICES = [
+    { device:'macbook-pro',    name:'SSH',        proto:'tcp',  bind:'127.0.0.1:22',    health:'healthy' },
+    { device:'homelab-server', name:'SSH',        proto:'tcp',  bind:'127.0.0.1:22',    health:'healthy' },
+    { device:'homelab-server', name:'Plex',       proto:'http', bind:'127.0.0.1:32400', health:'healthy' },
+    { device:'nas',            name:'SMB',        proto:'tcp',  bind:'127.0.0.1:445',   health:'healthy' },
+    { device:'nas',            name:'Admin UI',   proto:'http', bind:'127.0.0.1:5000',  health:'healthy' },
+    { device:'dev-box',        name:'SSH',        proto:'tcp',  bind:'127.0.0.1:22',    health:'healthy' },
+    { device:'dev-box',        name:'Code Server',proto:'http', bind:'127.0.0.1:8080',  health:'healthy' },
+    { device:'vpn-gateway',    name:'SSH',        proto:'tcp',  bind:'127.0.0.1:22',    health:'healthy' },
+    { device:'office-mac',     name:'SSH',        proto:'tcp',  bind:'127.0.0.1:22',    health:'healthy' },
+    { device:'media-server',   name:'Plex',       proto:'http', bind:'127.0.0.1:32400', health:'healthy' },
+    { device:'media-server',   name:'Sonarr',     proto:'http', bind:'127.0.0.1:8989',  health:'healthy' },
+    { device:'media-server',   name:'Radarr',     proto:'http', bind:'127.0.0.1:7878',  health:'healthy' },
+    { device:'cloud-relay',    name:'SSH',        proto:'tcp',  bind:'127.0.0.1:22',    health:'healthy' },
+    { device:'pi-hole',        name:'DNS Admin',  proto:'http', bind:'127.0.0.1:80',    health:'healthy' },
+    { device:'backup-server',  name:'SSH',        proto:'tcp',  bind:'127.0.0.1:22',    health:'healthy' },
+    { device:'backup-server',  name:'Restic REST',proto:'http', bind:'127.0.0.1:8000',  health:'healthy' },
+    { device:'test-vm',        name:'SSH',        proto:'tcp',  bind:'127.0.0.1:22',    health:'healthy' },
+  ];
+
+  // ── Row builders (DOM only) ──────────────────────────────────────────────────
+  const STATUS_DOT  = { active:'bg-emerald-400', offline:'bg-slate-600', pending:'bg-amber-400', revoked:'bg-red-700' };
+  const STATUS_TEXT = { active:'text-emerald-400', offline:'text-slate-400', pending:'text-amber-400', revoked:'text-red-400' };
+
+  function mkBtn(label, cls) {
+    const b = el('button', `text-xs px-2 py-1 rounded hover:bg-slate-700 transition-colors ${cls}`);
+    b.textContent = label;
+    return b;
+  }
+
+  function createDeviceRow(d) {
+    const dim = (d.status === 'offline' || d.status === 'revoked');
+    const row = el('tr', 'hover:bg-slate-700/30');
+
+    const nameTd = td('px-5 py-3');
+    const nameP = el('p', `font-medium ${dim ? 'text-slate-400' : 'text-slate-200'}`); nameP.textContent = d.name;
+    const idP = el('p', 'text-xs text-slate-500 font-mono'); idP.textContent = d.id;
+    nameTd.append(nameP, idP);
+
+    const statusTd = td('px-4 py-3');
+    const statusS = span(`flex items-center gap-1.5 ${STATUS_TEXT[d.status]} text-xs font-medium`);
+    const dot = el('span', `status-dot ${STATUS_DOT[d.status]}`);
+    statusS.append(dot); statusS.appendChild(document.createTextNode(d.status));
+    statusTd.appendChild(statusS);
+
+    const actionsTd = td('px-4 py-3 text-right');
+    const actionsWrap = el('div', 'flex items-center justify-end gap-2');
+    if (d.status === 'pending') {
+      actionsWrap.appendChild(mkBtn('Cancel', 'text-red-400 hover:text-red-300'));
+    } else if (d.status === 'revoked') {
+      actionsWrap.appendChild(mkBtn('Restore', 'text-indigo-400 hover:text-indigo-300'));
+    } else {
+      actionsWrap.append(mkBtn('Rotate key', 'text-slate-400 hover:text-slate-200'), mkBtn('Revoke', 'text-red-400 hover:text-red-300'));
+    }
+    actionsTd.appendChild(actionsWrap);
+
+    row.append(
+      nameTd, statusTd,
+      td('px-4 py-3 font-mono text-xs text-slate-400', d.ip),
+      td('px-4 py-3 text-slate-400 text-xs', d.platform),
+      td('px-4 py-3 font-mono text-xs text-slate-500', d.key),
+      td('px-4 py-3 text-xs text-slate-400', d.seen),
+      actionsTd
+    );
+    return row;
+  }
+
+  function createActiveSessionRow(s) {
+    const row = el('tr', 'hover:bg-slate-700/30');
+    const pathColor = s.path === 'relay' ? 'text-amber-400' : 'text-emerald-400';
+    const terminateTd = td('px-4 py-3 text-right');
+    terminateTd.appendChild(mkBtn('Terminate', 'text-red-400 hover:text-red-300'));
+    row.append(
+      td('px-5 py-3 font-mono text-xs text-slate-400', s.id),
+      td('px-4 py-3 text-slate-300', s.target),
+      (() => { const c = td('px-4 py-3'); c.appendChild(span(`text-xs font-medium ${pathColor}`, s.path)); return c; })(),
+      (() => { const c = td('px-4 py-3'); c.appendChild(span('text-xs font-medium text-emerald-400', s.status)); return c; })(),
+      td('px-4 py-3 text-xs text-slate-400 font-mono', s.opened),
+      td('px-4 py-3 text-xs text-slate-400 font-mono', s.expires),
+      terminateTd
+    );
+    return row;
+  }
+
+  function createClosedSessionRow(s) {
+    const row = el('tr', 'hover:bg-slate-700/30');
+    row.append(
+      td('px-5 py-3 font-mono text-xs text-slate-500', s.id),
+      td('px-4 py-3 text-slate-400', s.target),
+      td('px-4 py-3 text-xs text-slate-500', s.path),
+      td('px-4 py-3 text-xs text-slate-500 font-mono', s.duration),
+      td('px-4 py-3 text-xs text-slate-500 font-mono', s.closed)
+    );
+    return row;
+  }
+
+  function createServiceRow(s) {
+    const row = el('tr', 'hover:bg-slate-700/30');
+    const exposedTd = td('px-4 py-3'); exposedTd.appendChild(span('text-xs text-emerald-400 font-medium', 'yes'));
+    const healthTd  = td('px-4 py-3'); healthTd.appendChild(span('text-xs text-emerald-400', s.health));
+    row.append(
+      td('px-5 py-3 text-slate-300 font-medium', s.device),
+      td('px-4 py-3 text-slate-200', s.name),
+      td('px-4 py-3 text-xs font-mono text-slate-400', s.proto),
+      td('px-4 py-3 text-xs font-mono text-slate-400', s.bind),
+      exposedTd, healthTd
+    );
+    return row;
+  }
+
+  // ── Wire up ──────────────────────────────────────────────────────────────────
+  window.addEventListener('DOMContentLoaded', () => {
+    const devP = new Paginator({ bodyId:'devices-body',         footerId:'devices-footer',         pageSize:10, createRow:createDeviceRow,        emptyMessage:'No devices found' });
+    const saP  = new Paginator({ bodyId:'sessions-active-body', footerId:'sessions-active-footer', pageSize:10, createRow:createActiveSessionRow,  emptyMessage:'No active sessions' });
+    const scP  = new Paginator({ bodyId:'sessions-closed-body', footerId:'sessions-closed-footer', pageSize:10, createRow:createClosedSessionRow,  emptyMessage:'No closed sessions' });
+    const svP  = new Paginator({ bodyId:'services-body',        footerId:'services-footer',        pageSize:10, createRow:createServiceRow,        emptyMessage:'No services reported' });
+
+    devP.setData(DEVICES);
+    saP.setData(SESSIONS_ACTIVE);
+    scP.setData(SESSIONS_CLOSED);
+    svP.setData(SERVICES);
+
+    const applyDeviceFilter = () => {
+      const q = document.getElementById('device-search').value.toLowerCase();
+      const s = document.getElementById('device-status').value;
+      devP.setData(DEVICES.filter(d => (!q || d.name.includes(q) || d.id.includes(q)) && (!s || d.status === s)));
+    };
+    document.getElementById('device-search').addEventListener('input', applyDeviceFilter);
+    document.getElementById('device-status').addEventListener('change', applyDeviceFilter);
+
+    // ── OTP pairing input ────────────────────────────────────────────────────
+    const cells = Array.from(document.querySelectorAll('.otp-cell'));
+    const submitBtn = document.getElementById('pair-submit');
+    const statusEl = document.getElementById('pair-status');
+
+    function otpValue() { return cells.map(c => c.value).join(''); }
+    function updateSubmit() { submitBtn.disabled = otpValue().length < 6; }
+    function clearOtp() { cells.forEach(c => c.value = ''); cells[0].focus(); updateSubmit(); }
+
+    cells.forEach((cell, i) => {
+      cell.addEventListener('input', () => {
+        cell.value = cell.value.replace(/[^a-zA-Z0-9]/g, '').slice(-1).toUpperCase();
+        updateSubmit();
+        if (cell.value && i < cells.length - 1) cells[i + 1].focus();
+      });
+      cell.addEventListener('keydown', e => {
+        if (e.key === 'Backspace' && !cell.value && i > 0) { cells[i - 1].focus(); cells[i - 1].value = ''; updateSubmit(); }
+        if (e.key === 'ArrowLeft'  && i > 0) cells[i - 1].focus();
+        if (e.key === 'ArrowRight' && i < cells.length - 1) cells[i + 1].focus();
+      });
+      cell.addEventListener('paste', e => {
+        e.preventDefault();
+        const pasted = (e.clipboardData.getData('text') || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 6);
+        pasted.split('').forEach((ch, j) => { if (cells[j]) cells[j].value = ch; });
+        const next = Math.min(pasted.length, cells.length - 1);
+        cells[next].focus();
+        updateSubmit();
+      });
+    });
+
+    submitBtn.addEventListener('click', () => {
+      const code = otpValue();
+      if (code.length < 6) return;
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Linking…';
+      statusEl.className = 'text-sm text-slate-400';
+      statusEl.textContent = 'Verifying code…';
+      statusEl.classList.remove('hidden');
+      // Simulate server call — replace with real fetch to POST /v1/auth/pair/claim
+      setTimeout(() => {
+        // Success path
+        submitBtn.textContent = 'Linked';
+        statusEl.className = 'text-sm text-emerald-400';
+        statusEl.textContent = 'Device linked successfully. It will appear in the device list shortly.';
+        clearOtp();
+        setTimeout(() => showPage('devices'), 2000);
+      }, 1200);
+    });
+  });
+</script>
+
+</body>
+</html>
