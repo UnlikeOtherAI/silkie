@@ -1,16 +1,13 @@
-example.com {
-    encode zstd gzip
+silkie.example.com {
+  encode zstd gzip
 
-    header {
-        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
-        X-Content-Type-Options "nosniff"
-        X-Frame-Options "DENY"
-        Referrer-Policy "strict-origin-when-cross-origin"
-    }
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
+    Referrer-Policy "no-referrer"
+    X-Content-Type-Options "nosniff"
+    X-Frame-Options "DENY"
+  }
 
-    reverse_proxy server:{$SERVER_PORT:8080} {
-        header_up X-Forwarded-Proto {scheme}
-        header_up X-Forwarded-For {remote_host}
-        header_up X-Forwarded-Host {host}
-    }
+  reverse_proxy server:${SERVER_PORT}
 }
