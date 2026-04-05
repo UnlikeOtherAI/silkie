@@ -37,7 +37,7 @@ type pairCodeRecord struct {
 	RequestedAgentVersion string
 }
 
-//nolint:gocyclo // linear multi-step claim process is clearer as one function
+//nolint:gocyclo,gocognit // linear multi-step claim process is clearer as one function
 func (h *Handler) pairClaim(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()

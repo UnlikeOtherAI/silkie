@@ -46,7 +46,7 @@ services:
       - --max-port=49200
 
   server:
-    image: ghcr.io/unlikeotherai/silkie-server:latest
+    build: .
     restart: unless-stopped
     depends_on:
       postgres:

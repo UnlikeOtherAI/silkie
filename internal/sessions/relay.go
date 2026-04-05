@@ -4,6 +4,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha1" //nolint:gosec // SHA1 is required by coturn's use-auth-secret mechanism (RFC 5389)
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -55,7 +56,7 @@ func (h *Handler) handleRelayCredentials(w http.ResponseWriter, r *http.Request)
 		claims.Sub,
 	).Scan(&targetDeviceID)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			writeError(w, http.StatusNotFound, "session not found")
 			return
 		}
