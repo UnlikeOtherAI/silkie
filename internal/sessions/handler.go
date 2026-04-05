@@ -2,6 +2,7 @@
 package sessions
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -41,6 +42,7 @@ func (h *Handler) Mount(r chi.Router) {
 		r.Use(auth.Middleware(h.cfg))
 		r.Post("/v1/sessions", h.handleCreateSession)
 		r.Post("/v1/sessions/{id}/candidates", h.handleSessionCandidates)
+		r.Post("/v1/sessions/{id}/relay", h.handleRelayCredentials)
 		r.Get("/v1/sessions", h.handleListSessions)
 		r.Get("/v1/devices/{id}/events", h.handleDeviceEvents)
 	})
@@ -104,6 +106,10 @@ func (h *Handler) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to create session")
 		return
 	}
+
+	// Notify both requester and target devices about the new session.
+	h.publishDeviceEvent(r.Context(), req.RequesterDeviceID, "session_created", payload)
+	h.publishDeviceEvent(r.Context(), req.TargetDeviceID, "session_created", payload)
 
 	writeRawJSON(w, http.StatusOK, payload)
 }
@@ -238,6 +244,11 @@ func (h *Handler) handleDeviceEvents(w http.ResponseWriter, r *http.Request) {
 	_, _ = fmt.Fprintf(w, "event: connected\ndata: {\"device_id\":%q}\n\n", deviceID) //nolint:errcheck // best-effort SSE write
 	flusher.Flush()
 
+	channel := fmt.Sprintf("silkie:device:%s:events", deviceID)
+	sub := h.rdb.Subscribe(r.Context(), channel)
+	defer sub.Close() //nolint:errcheck // best-effort close on SSE teardown
+
+	redisCh := sub.Channel()
 	ticker := time.NewTicker(25 * time.Second)
 	defer ticker.Stop()
 
@@ -245,10 +256,37 @@ func (h *Handler) handleDeviceEvents(w http.ResponseWriter, r *http.Request) {
 		select {
 		case <-r.Context().Done():
 			return
+		case msg := <-redisCh:
+			if msg == nil {
+				return
+			}
+			_, _ = fmt.Fprintf(w, "event: session\ndata: %s\n\n", msg.Payload) //nolint:errcheck // best-effort SSE write
+			flusher.Flush()
 		case <-ticker.C:
 			_, _ = io.WriteString(w, ": keepalive\n\n") //nolint:errcheck // best-effort SSE keepalive
 			flusher.Flush()
 		}
+	}
+}
+
+// publishDeviceEvent publishes an event to the Redis channel for a device.
+// Failures are logged but do not propagate — event delivery is best-effort.
+func (h *Handler) publishDeviceEvent(ctx context.Context, deviceID, eventType string, payload []byte) {
+	channel := fmt.Sprintf("silkie:device:%s:events", deviceID)
+
+	envelope, err := json.Marshal(map[string]any{
+		"event_type": eventType,
+		"device_id":  deviceID,
+		"payload":    json.RawMessage(payload),
+		"timestamp":  time.Now().UTC(),
+	})
+	if err != nil {
+		h.logger.Error("marshal device event", zap.Error(err), zap.String("device_id", deviceID), zap.String("event_type", eventType))
+		return
+	}
+
+	if err := h.rdb.Publish(ctx, channel, envelope).Err(); err != nil {
+		h.logger.Error("publish device event", zap.Error(err), zap.String("device_id", deviceID), zap.String("event_type", eventType))
 	}
 }
 
