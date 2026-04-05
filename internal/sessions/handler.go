@@ -18,17 +18,18 @@ import (
 )
 
 type Handler struct {
+	rdb    *store.Redis
 	db     *store.DB
 	logger *zap.Logger
 	cfg    config.Config
 }
 
-func New(db *store.DB, logger *zap.Logger, cfg config.Config) *Handler {
+func New(db *store.DB, rdb *store.Redis, logger *zap.Logger, cfg config.Config) *Handler {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
 
-	return &Handler{db: db, logger: logger, cfg: cfg}
+	return &Handler{db: db, rdb: rdb, logger: logger, cfg: cfg}
 }
 
 func (h *Handler) Mount(r chi.Router) {

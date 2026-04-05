@@ -16,6 +16,8 @@ import (
 	"go.uber.org/zap/zapcore"
 
 	"github.com/unlikeotherai/silkie/internal/config"
+	"github.com/unlikeotherai/silkie/internal/admin"
+	"github.com/unlikeotherai/silkie/internal/auth"
 	"github.com/unlikeotherai/silkie/internal/devices"
 	"github.com/unlikeotherai/silkie/internal/sessions"
 	"github.com/unlikeotherai/silkie/internal/store"
@@ -77,8 +79,10 @@ func runServe(ctx context.Context, cfg config.Config, logger *zap.Logger) error 
 		w.Write([]byte("ready")) //nolint:errcheck
 	})
 
+	auth.NewCallbackHandler(db, cfg).Mount(r)
+	admin.New().Mount(r)
 	devices.New(db, logger, cfg).Mount(r)
-	sessions.New(db, logger, cfg).Mount(r)
+	sessions.New(db, rdb, logger, cfg).Mount(r)
 
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.ServerPort),
