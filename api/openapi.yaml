@@ -1,0 +1,794 @@
+openapi: "3.1.0"
+info:
+  title: Silkie Control Plane API
+  version: "0.1.0"
+  description: |
+    Self-hosted zero-trust access layer built on WireGuard.
+
+    All `/v1/*` endpoints require a valid JWT in the `Authorization: Bearer <token>` header.
+    Tokens are issued via the OAuth callback flow at `/auth/callback`.
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+  contact:
+    name: Ondrej Rafaj
+    email: ondrej@unlikeotherai.com
+
+servers:
+  - url: /
+    description: Same-origin (relative)
+
+tags:
+  - name: health
+    description: Liveness and readiness probes
+  - name: auth
+    description: OAuth callback and token issuance
+  - name: pairing
+    description: Device enrollment via pair codes
+  - name: devices
+    description: Device lifecycle and management
+  - name: sessions
+    description: Connection session brokering and ICE signaling
+  - name: events
+    description: Server-Sent Events for real-time device updates
+  - name: admin
+    description: Admin UI pages
+
+security: []
+
+paths:
+  /healthz:
+    get:
+      operationId: healthz
+      tags: [health]
+      summary: Liveness probe
+      responses:
+        "200":
+          description: Server is alive
+          content:
+            text/plain:
+              schema:
+                type: string
+                const: ok
+
+  /readyz:
+    get:
+      operationId: readyz
+      tags: [health]
+      summary: Readiness probe
+      description: Checks database and Redis connectivity. Returns 503 during graceful shutdown.
+      responses:
+        "200":
+          description: Server is ready
+          content:
+            text/plain:
+              schema:
+                type: string
+                const: ready
+        "503":
+          description: Not ready (shutting down, database or Redis unavailable)
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /auth/callback:
+    get:
+      operationId: authCallback
+      tags: [auth]
+      summary: OAuth code exchange callback
+      description: |
+        Exchanges an OAuth authorization code for an access token, upserts the
+        user, and redirects to the admin UI with a signed JWT in the URL fragment.
+        The first user to log in becomes the super-admin.
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "302":
+          description: Redirect to `/admin#token={jwt}`
+          headers:
+            Location:
+              schema:
+                type: string
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /admin:
+    get:
+      operationId: adminUI
+      tags: [admin]
+      summary: Admin single-page application
+      responses:
+        "200":
+          description: Admin HTML page
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /login:
+    get:
+      operationId: loginPage
+      tags: [admin]
+      summary: Login page
+      responses:
+        "200":
+          description: Login HTML page
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /:
+    get:
+      operationId: rootRedirect
+      tags: [admin]
+      summary: Redirect to admin UI
+      responses:
+        "302":
+          description: Redirect to /admin
+          headers:
+            Location:
+              schema:
+                type: string
+                const: /admin
+
+  /v1/auth/pair/start:
+    post:
+      operationId: pairStart
+      tags: [pairing]
+      summary: Generate a device pair code
+      description: |
+        Creates a 6-character alphanumeric pair code valid for 10 minutes.
+        The code is returned in plaintext; only its SHA-256 hash is stored.
+        Retries up to 5 times on hash collision.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PairStartRequest"
+      responses:
+        "200":
+          description: Pair code created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PairStartResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/auth/pair/status:
+    get:
+      operationId: pairStatus
+      tags: [pairing]
+      summary: Check pair code status
+      description: |
+        Polls the status of a pair code. Returns `pending` until claimed,
+        then `claimed` with the assigned device ID.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: code
+          in: query
+          required: true
+          description: The 6-character pair code (case-insensitive)
+          schema:
+            type: string
+            minLength: 6
+            maxLength: 6
+            pattern: "^[A-Za-z]{6}$"
+      responses:
+        "200":
+          description: Pair code status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PairStatusResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/auth/pair/claim:
+    post:
+      operationId: pairClaim
+      tags: [pairing]
+      summary: Claim a pair code and create a device
+      description: |
+        Validates the pair code, creates a device and device key in a single
+        transaction, allocates an overlay IP (if configured), marks the code
+        as claimed, and returns a credential for the new device.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PairClaimRequest"
+      responses:
+        "200":
+          description: Device created and pair code claimed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PairClaimResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Invalid, expired, or already-claimed code
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "423":
+          description: Code locked after 5 failed attempts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/devices:
+    get:
+      operationId: listDevices
+      tags: [devices]
+      summary: List devices owned by the authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Array of devices
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Device"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/devices/{id}:
+    get:
+      operationId: getDevice
+      tags: [devices]
+      summary: Get a single device
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/DeviceID"
+      responses:
+        "200":
+          description: Device details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Device"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    delete:
+      operationId: revokeDevice
+      tags: [devices]
+      summary: Revoke a device
+      description: |
+        Sets the device status to `revoked` and schedules overlay IP reclamation
+        after 24 hours.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/DeviceID"
+      responses:
+        "204":
+          description: Device revoked
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/devices/{id}/heartbeat:
+    post:
+      operationId: deviceHeartbeat
+      tags: [devices]
+      summary: Report device heartbeat
+      description: Updates endpoint info, agent version, and disk stats.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/DeviceID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HeartbeatRequest"
+      responses:
+        "204":
+          description: Heartbeat recorded
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/devices/{id}/events:
+    get:
+      operationId: deviceEvents
+      tags: [events]
+      summary: Subscribe to device events (SSE)
+      description: |
+        Opens a Server-Sent Events stream for real-time device updates.
+        Sends a `connected` event on open, then `: keepalive` comments
+        every 25 seconds. Session-related events are published via Redis
+        pub/sub on channel `silkie:device:{id}:events`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/DeviceID"
+      responses:
+        "200":
+          description: SSE event stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: |
+                  Events:
+                  - `event: connected` — initial connection confirmation
+                  - `event: session` — session state change
+                  - `: keepalive` — comment-only ping every 25s
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/sessions:
+    get:
+      operationId: listSessions
+      tags: [sessions]
+      summary: List sessions for the authenticated user
+      description: Returns the 50 most recent sessions.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Array of sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ConnectSession"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+    post:
+      operationId: createSession
+      tags: [sessions]
+      summary: Create a connection session
+      description: |
+        Initiates a peer-to-peer connection session between two devices.
+        The session expires after 1 hour.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSessionRequest"
+      responses:
+        "200":
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectSession"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/sessions/{id}/candidates:
+    post:
+      operationId: submitCandidates
+      tags: [sessions]
+      summary: Submit ICE candidates for a session
+      description: |
+        Stores ICE candidates for either the requester or target side of
+        a connection session.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/SessionID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CandidatesRequest"
+      responses:
+        "204":
+          description: Candidates stored
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT issued by the `/auth/callback` endpoint. Claims:
+        - `sub` — user UUID
+        - `is_super` — boolean, true for super-admin
+        - `iss` — "silkie"
+        - `iat`, `exp` — issued/expiry timestamps (24h TTL)
+
+  parameters:
+    DeviceID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    SessionID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    PairStartRequest:
+      type: object
+      required:
+        - wg_public_key
+        - hostname
+        - os_platform
+        - os_arch
+        - agent_version
+      properties:
+        wg_public_key:
+          type: string
+          pattern: "^[A-Za-z0-9+/]{43}=$"
+          description: WireGuard public key (base64)
+        hostname:
+          type: string
+        os_platform:
+          type: string
+          enum: [darwin, linux, windows, ios, android]
+        os_arch:
+          type: string
+        agent_version:
+          type: string
+
+    PairStartResponse:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          minLength: 6
+          maxLength: 6
+          description: 6-character uppercase alphanumeric pair code (10-minute TTL)
+
+    PairStatusResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [pending, claimed, expired, locked]
+        device_id:
+          type: string
+          format: uuid
+          nullable: true
+
+    PairClaimRequest:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          description: The 6-character pair code
+        device_name:
+          type: string
+          description: Optional hostname override for the new device
+
+    PairClaimResponse:
+      type: object
+      required: [device_id, credential]
+      properties:
+        device_id:
+          type: string
+          format: uuid
+        overlay_ip:
+          type: string
+          nullable: true
+          description: Allocated overlay IP (e.g. "10.99.0.1"), null if overlay not configured
+        credential:
+          type: string
+          description: Base64url-encoded 32-byte device credential
+
+    Device:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        owner_user_id:
+          type: string
+          format: uuid
+        hostname:
+          type: string
+        status:
+          type: string
+          enum: [pending, active, revoked, quarantined]
+        overlay_ip:
+          type: string
+          nullable: true
+        overlay_ip_allocated_at:
+          type: string
+          format: date-time
+          nullable: true
+        credential_issued_at:
+          type: string
+          format: date-time
+        credential_rotated_at:
+          type: string
+          format: date-time
+        agent_version:
+          type: string
+        os_platform:
+          type: string
+          enum: [darwin, linux, windows, ios, android]
+        os_version:
+          type: string
+        os_arch:
+          type: string
+        kernel_version:
+          type: string
+        cpu_model:
+          type: string
+        cpu_cores:
+          type: integer
+        cpu_speed_mhz:
+          type: integer
+          nullable: true
+        total_memory_bytes:
+          type: integer
+          format: int64
+        disk_total_bytes:
+          type: integer
+          format: int64
+        disk_free_bytes:
+          type: integer
+          format: int64
+        network_interfaces:
+          type: array
+          items:
+            type: object
+        tags:
+          type: array
+          items:
+            type: string
+        capabilities:
+          type: array
+          items:
+            type: string
+        external_endpoint_host:
+          type: string
+          nullable: true
+        external_endpoint_port:
+          type: integer
+          nullable: true
+        last_seen_at:
+          type: string
+          format: date-time
+          nullable: true
+        revoked_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    HeartbeatRequest:
+      type: object
+      properties:
+        external_endpoint_host:
+          type: string
+        external_endpoint_port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        agent_version:
+          type: string
+        disk_free_bytes:
+          type: integer
+          format: int64
+
+    CreateSessionRequest:
+      type: object
+      required:
+        - requester_device_id
+        - target_device_id
+        - target_service_id
+        - requested_action
+      properties:
+        requester_device_id:
+          type: string
+          format: uuid
+        target_device_id:
+          type: string
+          format: uuid
+        target_service_id:
+          type: string
+          format: uuid
+        requested_action:
+          type: string
+
+    ConnectSession:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        requester_user_id:
+          type: string
+          format: uuid
+        requester_device_id:
+          type: string
+          format: uuid
+        target_device_id:
+          type: string
+          format: uuid
+        target_service_id:
+          type: string
+          format: uuid
+        requested_action:
+          type: string
+        status:
+          type: string
+          enum:
+            - pending
+            - authorizing
+            - candidate_exchange
+            - established
+            - closing
+            - closed
+            - denied
+            - expired
+            - failed
+        requester_candidate_set:
+          type: array
+          nullable: true
+          items: {}
+        target_candidate_set:
+          type: array
+          nullable: true
+          items: {}
+        selected_path:
+          type: string
+          enum: [direct, relay]
+          nullable: true
+        denial_reason:
+          type: string
+          nullable: true
+        expires_at:
+          type: string
+          format: date-time
+        established_at:
+          type: string
+          format: date-time
+          nullable: true
+        closed_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CandidatesRequest:
+      type: object
+      required: [role, candidates]
+      properties:
+        role:
+          type: string
+          enum: [requester, target]
+        candidates:
+          type: array
+          items: {}
+          description: ICE candidate objects
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+    Unauthorized:
+      description: Missing or invalid JWT
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
