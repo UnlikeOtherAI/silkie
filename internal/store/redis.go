@@ -15,9 +15,10 @@ type Redis struct {
 }
 
 // NewRedis connects to Redis, pings, and returns a ready client.
+// If REDIS_URL is empty, returns nil (Redis features are disabled).
 func NewRedis(ctx context.Context, cfg config.Config) (*Redis, error) {
 	if cfg.RedisURL == "" {
-		return nil, errors.New("redis url is required")
+		return nil, nil //nolint:nilnil // nil signals Redis is disabled, not an error
 	}
 
 	options, err := redis.ParseURL(cfg.RedisURL)

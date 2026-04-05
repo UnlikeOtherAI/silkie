@@ -244,6 +244,12 @@ func (h *Handler) handleDeviceEvents(w http.ResponseWriter, r *http.Request) {
 	_, _ = fmt.Fprintf(w, "event: connected\ndata: {\"device_id\":%q}\n\n", deviceID) //nolint:errcheck // best-effort SSE write
 	flusher.Flush()
 
+	if h.rdb == nil {
+		_, _ = fmt.Fprintf(w, "event: error\ndata: {\"message\":\"SSE unavailable (redis not configured)\"}\n\n") //nolint:errcheck // best-effort SSE write
+		flusher.Flush()
+		return
+	}
+
 	channel := fmt.Sprintf("silkie:device:%s:events", deviceID)
 	sub := h.rdb.Subscribe(r.Context(), channel)
 	defer sub.Close() //nolint:errcheck // best-effort close on SSE teardown
@@ -272,6 +278,10 @@ func (h *Handler) handleDeviceEvents(w http.ResponseWriter, r *http.Request) {
 // publishDeviceEvent publishes an event to the Redis channel for a device.
 // Failures are logged but do not propagate — event delivery is best-effort.
 func (h *Handler) publishDeviceEvent(ctx context.Context, deviceID, eventType string, payload []byte) {
+	if h.rdb == nil {
+		return
+	}
+
 	channel := fmt.Sprintf("silkie:device:%s:events", deviceID)
 
 	envelope, err := json.Marshal(map[string]any{

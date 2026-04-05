@@ -53,7 +53,7 @@ func Load() Config {
 		WGServerPublicKey:        os.Getenv("WG_SERVER_PUBLIC_KEY"),
 		WGServerEndpoint:         os.Getenv("WG_SERVER_ENDPOINT"),
 		WGServerPort:             getenvInt("WG_SERVER_PORT", 51820),
-		ServerPort:               getenvInt("SERVER_PORT", 8080),
+		ServerPort:               getenvIntMulti([]string{"PORT", "SERVER_PORT"}, 8080),
 		LogLevel:                 getenv("LOG_LEVEL", "info"),
 		OTELExporterOTLPEndpoint: os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"),
 		OPAEndpoint:              os.Getenv("OPA_ENDPOINT"),
@@ -67,6 +67,17 @@ func getenv(key, fallback string) string {
 	}
 
 	return value
+}
+
+func getenvIntMulti(keys []string, fallback int) int {
+	for _, key := range keys {
+		if v := os.Getenv(key); v != "" {
+			if parsed, err := strconv.Atoi(v); err == nil {
+				return parsed
+			}
+		}
+	}
+	return fallback
 }
 
 func getenvInt(key string, fallback int) int {

@@ -40,6 +40,7 @@ func main() {
 	}
 }
 
+//nolint:gocognit,gocyclo // linear server bootstrap is clearer as one function
 func runServe(ctx context.Context, cfg config.Config, logger *zap.Logger) error {
 	// Initialize OpenTelemetry (noop when endpoint is empty).
 	otelShutdown, err := telemetry.Init(ctx, telemetry.Config{
@@ -66,7 +67,12 @@ func runServe(ctx context.Context, cfg config.Config, logger *zap.Logger) error 
 	if err != nil {
 		return fmt.Errorf("open redis: %w", err)
 	}
-	defer rdb.Close() //nolint:errcheck // best-effort close on shutdown
+	if rdb != nil {
+		defer rdb.Close() //nolint:errcheck // best-effort close on shutdown
+		logger.Info("redis connected")
+	} else {
+		logger.Warn("redis disabled (REDIS_URL not set), SSE fan-out unavailable")
+	}
 
 	var overlayAlloc *overlay.Allocator
 	if cfg.WGOverlayCIDR != "" {
@@ -103,9 +109,11 @@ func runServe(ctx context.Context, cfg config.Config, logger *zap.Logger) error 
 			http.Error(w, "db unavailable", http.StatusServiceUnavailable)
 			return
 		}
-		if pingErr := rdb.Ping(pCtx); pingErr != nil {
-			http.Error(w, "redis unavailable", http.StatusServiceUnavailable)
-			return
+		if rdb != nil {
+			if pingErr := rdb.Ping(pCtx); pingErr != nil {
+				http.Error(w, "redis unavailable", http.StatusServiceUnavailable)
+				return
+			}
 		}
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("ready"))
