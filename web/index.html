@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>Silkie — Self-hosted zero-trust access layer</title>
+	<meta name="description" content="Silkie is a self-hosted management and administration layer for a WireGuard-based zero-trust overlay network. Device enrollment, session brokering, STUN/TURN-assisted NAT traversal, and a clean admin UI." />
+	<link rel="icon" type="image/png" href="/assets/icon-1024.png" />
+	<meta property="og:title" content="Silkie — Self-hosted zero-trust access layer" />
+	<meta property="og:description" content="Device enrollment, session brokering, and NAT traversal for a WireGuard overlay you control." />
+	<meta property="og:image" content="/assets/icon-1024.png" />
+	<meta property="og:type" content="website" />
+	<script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+	<script>
+		tailwind.config = {
+			theme: {
+				extend: {
+					fontFamily: {
+						sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
+						mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+					},
+					colors: {
+						ink: {
+							950: '#07080b',
+							900: '#0b0d12',
+							800: '#11141b',
+							700: '#1a1e28',
+							600: '#262b38',
+							500: '#3b4250',
+							400: '#6b7387',
+							300: '#a4aabb',
+							200: '#cfd3df',
+							100: '#eceef4',
+						},
+						accent: {
+							400: '#8ef2c4',
+							500: '#4ee8a3',
+							600: '#1fc581',
+						},
+					},
+				},
+			},
+		};
+	</script>
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+	<style>
+		html { scroll-behavior: smooth; }
+		body { font-feature-settings: "cv11", "ss01", "ss03"; }
+		.grid-bg {
+			background-image:
+				radial-gradient(circle at 20% 10%, rgba(78, 232, 163, 0.10), transparent 45%),
+				radial-gradient(circle at 80% 0%, rgba(31, 197, 129, 0.08), transparent 55%),
+				linear-gradient(to bottom, #07080b, #0b0d12 40%, #07080b);
+		}
+		.hairline { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04); }
+	</style>
+</head>
+<body class="bg-ink-950 text-ink-100 font-sans antialiased">
+	<header class="sticky top-0 z-40 backdrop-blur bg-ink-950/70 border-b border-ink-800">
+		<div class="max-w-6xl mx-auto flex items-center justify-between px-6 h-16">
+			<a href="#top" class="flex items-center gap-3">
+				<img src="../assets/icon-1024.png" alt="" class="h-8 w-8 rounded-lg" />
+				<span class="font-semibold tracking-tight">Silkie</span>
+			</a>
+			<nav class="hidden md:flex items-center gap-8 text-sm text-ink-300">
+				<a href="#features" class="hover:text-white transition">Features</a>
+				<a href="#architecture" class="hover:text-white transition">Architecture</a>
+				<a href="#quickstart" class="hover:text-white transition">Quick start</a>
+				<a href="#docs" class="hover:text-white transition">Docs</a>
+			</nav>
+			<a href="https://github.com/rafiki270/silkie" class="inline-flex items-center gap-2 text-sm font-medium rounded-lg border border-ink-700 hover:border-ink-500 px-3 py-1.5 transition">
+				<svg viewBox="0 0 24 24" fill="currentColor" class="h-4 w-4" aria-hidden="true"><path d="M12 .5C5.73.5.75 5.48.75 11.75c0 4.98 3.23 9.2 7.72 10.7.57.1.78-.25.78-.55v-2c-3.14.68-3.8-1.34-3.8-1.34-.51-1.3-1.25-1.65-1.25-1.65-1.02-.7.08-.68.08-.68 1.13.08 1.73 1.16 1.73 1.16 1 1.73 2.64 1.23 3.28.94.1-.73.4-1.23.72-1.51-2.5-.28-5.13-1.25-5.13-5.58 0-1.23.44-2.24 1.16-3.03-.12-.28-.5-1.44.11-3 0 0 .94-.3 3.08 1.16.9-.25 1.86-.38 2.82-.38.96 0 1.93.13 2.83.38 2.14-1.46 3.08-1.16 3.08-1.16.61 1.56.23 2.72.11 3 .72.79 1.15 1.8 1.15 3.03 0 4.34-2.64 5.29-5.15 5.57.4.35.77 1.05.77 2.12v3.14c0 .3.2.66.79.55 4.48-1.5 7.71-5.72 7.71-10.7C23.25 5.48 18.27.5 12 .5z"/></svg>
+				GitHub
+			</a>
+		</div>
+	</header>
+
+	<section id="top" class="grid-bg relative overflow-hidden">
+		<div class="max-w-6xl mx-auto px-6 pt-24 pb-20 md:pt-32 md:pb-28">
+			<div class="flex flex-col items-center text-center">
+				<img src="../assets/icon-1024.png" alt="Silkie" class="h-24 w-24 rounded-2xl shadow-2xl shadow-accent-500/10 ring-1 ring-white/10" />
+				<div class="mt-8 inline-flex items-center gap-2 text-xs font-medium text-accent-400 bg-accent-500/10 border border-accent-500/20 rounded-full px-3 py-1">
+					<span class="h-1.5 w-1.5 rounded-full bg-accent-500 animate-pulse"></span>
+					Self-hosted · Apache 2.0 · Built on WireGuard
+				</div>
+				<h1 class="mt-6 text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight leading-[1.05]">
+					Your private network,
+					<span class="block bg-gradient-to-r from-accent-400 to-accent-600 bg-clip-text text-transparent">on your infrastructure.</span>
+				</h1>
+				<p class="mt-6 max-w-2xl text-lg text-ink-300 leading-relaxed">
+					Silkie is a zero-trust access layer you run yourself. Enroll devices, broker peer-to-peer sessions over WireGuard, and manage everything from a clean admin UI — without handing your identity graph to a vendor.
+				</p>
+				<div class="mt-10 flex flex-wrap items-center justify-center gap-3">
+					<a href="#quickstart" class="inline-flex items-center gap-2 bg-accent-500 hover:bg-accent-400 text-ink-950 font-semibold rounded-xl px-5 py-3 transition shadow-lg shadow-accent-500/20">
+						Get started
+						<svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M3 10a.75.75 0 0 1 .75-.75h10.638L10.23 5.29a.75.75 0 1 1 1.04-1.08l5.5 5.25a.75.75 0 0 1 0 1.08l-5.5 5.25a.75.75 0 1 1-1.04-1.08l4.158-3.96H3.75A.75.75 0 0 1 3 10Z" clip-rule="evenodd"/></svg>
+					</a>
+					<a href="https://github.com/rafiki270/silkie" class="inline-flex items-center gap-2 border border-ink-700 hover:border-ink-500 text-ink-100 font-medium rounded-xl px-5 py-3 transition">
+						View on GitHub
+					</a>
+				</div>
+				<div class="mt-10 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-xs text-ink-400">
+					<span class="flex items-center gap-2"><span class="h-1 w-1 rounded-full bg-ink-500"></span>Go 1.23 control plane</span>
+					<span class="flex items-center gap-2"><span class="h-1 w-1 rounded-full bg-ink-500"></span>Postgres + Redis</span>
+					<span class="flex items-center gap-2"><span class="h-1 w-1 rounded-full bg-ink-500"></span>STUN/TURN (coturn)</span>
+					<span class="flex items-center gap-2"><span class="h-1 w-1 rounded-full bg-ink-500"></span>macOS · Linux · iOS · Android</span>
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<section id="features" class="border-t border-ink-800">
+		<div class="max-w-6xl mx-auto px-6 py-20 md:py-28">
+			<div class="max-w-2xl">
+				<div class="text-xs font-semibold uppercase tracking-widest text-accent-500">Features</div>
+				<h2 class="mt-3 text-3xl md:text-4xl font-bold tracking-tight">Everything needed to run a private overlay.</h2>
+				<p class="mt-4 text-ink-300">Identity, device enrollment, session brokering, policy, and audit — in one self-hosted binary you can run anywhere.</p>
+			</div>
+			<div class="mt-14 grid gap-px bg-ink-800 border border-ink-800 rounded-2xl overflow-hidden sm:grid-cols-2 lg:grid-cols-3">
+				<div class="bg-ink-900 p-7 hairline">
+					<div class="h-10 w-10 rounded-xl bg-accent-500/10 border border-accent-500/20 flex items-center justify-center text-accent-400">
+						<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>
+					</div>
+					<h3 class="mt-5 font-semibold text-lg">Zero-trust enrollment</h3>
+					<p class="mt-2 text-sm text-ink-300 leading-relaxed">Short pair codes, device-bound credentials, SSO-backed admin. The first login becomes the super-user account.</p>
+				</div>
+				<div class="bg-ink-900 p-7 hairline">
+					<div class="h-10 w-10 rounded-xl bg-accent-500/10 border border-accent-500/20 flex items-center justify-center text-accent-400">
+						<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h16M4 6h16M4 18h10"/></svg>
+					</div>
+					<h3 class="mt-5 font-semibold text-lg">WireGuard overlay</h3>
+					<p class="mt-2 text-sm text-ink-300 leading-relaxed">Every enrolled device gets a static overlay IP on a network you control. Keys never leave the device.</p>
+				</div>
+				<div class="bg-ink-900 p-7 hairline">
+					<div class="h-10 w-10 rounded-xl bg-accent-500/10 border border-accent-500/20 flex items-center justify-center text-accent-400">
+						<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 8a5 5 0 0 1 10 0v2M6 10h12l-1 10H7L6 10Z"/></svg>
+					</div>
+					<h3 class="mt-5 font-semibold text-lg">Session brokering</h3>
+					<p class="mt-2 text-sm text-ink-300 leading-relaxed">Short-lived session tokens, ICE candidate exchange, and STUN/TURN fallback via bundled coturn.</p>
+				</div>
+				<div class="bg-ink-900 p-7 hairline">
+					<div class="h-10 w-10 rounded-xl bg-accent-500/10 border border-accent-500/20 flex items-center justify-center text-accent-400">
+						<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>
+					</div>
+					<h3 class="mt-5 font-semibold text-lg">Admin UI</h3>
+					<p class="mt-2 text-sm text-ink-300 leading-relaxed">Single-page UI for device management, session history, relay health, and system status. No build step.</p>
+				</div>
+				<div class="bg-ink-900 p-7 hairline">
+					<div class="h-10 w-10 rounded-xl bg-accent-500/10 border border-accent-500/20 flex items-center justify-center text-accent-400">
+						<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h8"/></svg>
+					</div>
+					<h3 class="mt-5 font-semibold text-lg">Native mobile apps</h3>
+					<p class="mt-2 text-sm text-ink-300 leading-relaxed">First-party iOS and Android clients that enroll and connect to your server with a QR code.</p>
+				</div>
+				<div class="bg-ink-900 p-7 hairline">
+					<div class="h-10 w-10 rounded-xl bg-accent-500/10 border border-accent-500/20 flex items-center justify-center text-accent-400">
+						<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v6H4zM4 14h16v6H4zM8 7h.01M8 17h.01"/></svg>
+					</div>
+					<h3 class="mt-5 font-semibold text-lg">Audit & policy</h3>
+					<p class="mt-2 text-sm text-ink-300 leading-relaxed">Every session logged; revocation is immediate and uniform across device, admin, and policy paths.</p>
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<section id="architecture" class="border-t border-ink-800 bg-ink-900/40">
+		<div class="max-w-6xl mx-auto px-6 py-20 md:py-28">
+			<div class="grid lg:grid-cols-2 gap-14 items-start">
+				<div>
+					<div class="text-xs font-semibold uppercase tracking-widest text-accent-500">Architecture</div>
+					<h2 class="mt-3 text-3xl md:text-4xl font-bold tracking-tight">Control plane only. Never in the data path.</h2>
+					<p class="mt-4 text-ink-300 leading-relaxed">
+						The control server coordinates identity and session establishment. Once a connection is established, peers communicate directly over the WireGuard overlay — or via TURN relay when direct paths are blocked by NAT.
+					</p>
+					<ul class="mt-6 space-y-3 text-sm text-ink-200">
+						<li class="flex gap-3"><span class="mt-1.5 h-1.5 w-1.5 rounded-full bg-accent-500"></span>Go 1.23 control server (chi · pgx · go-redis · zap)</li>
+						<li class="flex gap-3"><span class="mt-1.5 h-1.5 w-1.5 rounded-full bg-accent-500"></span>Postgres for durable state, Redis for ephemeral fan-out</li>
+						<li class="flex gap-3"><span class="mt-1.5 h-1.5 w-1.5 rounded-full bg-accent-500"></span>coturn for STUN/TURN, Caddy for automatic TLS</li>
+						<li class="flex gap-3"><span class="mt-1.5 h-1.5 w-1.5 rounded-full bg-accent-500"></span>Single <code class="font-mono text-xs bg-ink-800 px-1.5 py-0.5 rounded">docker compose up</code> to run the whole stack</li>
+					</ul>
+				</div>
+				<div class="rounded-2xl border border-ink-800 bg-ink-950 p-2 shadow-2xl shadow-black/50">
+					<div class="flex items-center gap-1.5 px-3 py-2">
+						<span class="h-2.5 w-2.5 rounded-full bg-ink-700"></span>
+						<span class="h-2.5 w-2.5 rounded-full bg-ink-700"></span>
+						<span class="h-2.5 w-2.5 rounded-full bg-ink-700"></span>
+						<span class="ml-2 text-[10px] tracking-wider text-ink-500 font-mono">silkie topology</span>
+					</div>
+<pre class="font-mono text-[12.5px] leading-6 text-ink-200 p-5 overflow-auto"><span class="text-ink-400">┌─────────────────────────────────────────────┐</span>
+<span class="text-ink-400">│</span>  Admin UI <span class="text-ink-500">·</span> Mobile apps <span class="text-ink-500">·</span> CLI daemon     <span class="text-ink-400">│</span>
+<span class="text-ink-400">└─────────────────────┬───────────────────────┘</span>
+                      <span class="text-ink-400">│</span> HTTPS <span class="text-ink-500">(session JWT)</span>
+<span class="text-ink-400">┌─────────────────────▼───────────────────────┐</span>
+<span class="text-ink-400">│</span>  <span class="text-accent-400">Control server</span>                             <span class="text-ink-400">│</span>
+<span class="text-ink-400">│</span>  Auth <span class="text-ink-500">·</span> Devices <span class="text-ink-500">·</span> Sessions <span class="text-ink-500">·</span> Audit      <span class="text-ink-400">│</span>
+<span class="text-ink-400">│</span>  Postgres <span class="text-ink-500">·</span> Redis <span class="text-ink-500">·</span> coturn                 <span class="text-ink-400">│</span>
+<span class="text-ink-400">└─────────────────────┬───────────────────────┘</span>
+                      <span class="text-ink-400">│</span> WireGuard overlay
+<span class="text-ink-400">┌─────────────────────▼───────────────────────┐</span>
+<span class="text-ink-400">│</span>  Peers connect directly <span class="text-ink-500">(or via TURN)</span>      <span class="text-ink-400">│</span>
+<span class="text-ink-400">└─────────────────────────────────────────────┘</span>
+</pre>
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<section id="quickstart" class="border-t border-ink-800">
+		<div class="max-w-6xl mx-auto px-6 py-20 md:py-28">
+			<div class="grid lg:grid-cols-2 gap-14 items-start">
+				<div>
+					<div class="text-xs font-semibold uppercase tracking-widest text-accent-500">Quick start</div>
+					<h2 class="mt-3 text-3xl md:text-4xl font-bold tracking-tight">Running in under five minutes.</h2>
+					<p class="mt-4 text-ink-300 leading-relaxed">
+						Clone the repo, fill in your environment, and bring up the full stack with Docker Compose. The first admin login becomes the super-user account automatically.
+					</p>
+					<div class="mt-6 space-y-4">
+						<div class="flex gap-4">
+							<div class="shrink-0 h-7 w-7 rounded-full bg-accent-500/10 border border-accent-500/20 text-accent-400 text-sm font-semibold flex items-center justify-center">1</div>
+							<div class="text-sm text-ink-200">Clone the repository and copy <code class="font-mono text-xs bg-ink-800 px-1.5 py-0.5 rounded">.env.example</code> to <code class="font-mono text-xs bg-ink-800 px-1.5 py-0.5 rounded">.env</code>.</div>
+						</div>
+						<div class="flex gap-4">
+							<div class="shrink-0 h-7 w-7 rounded-full bg-accent-500/10 border border-accent-500/20 text-accent-400 text-sm font-semibold flex items-center justify-center">2</div>
+							<div class="text-sm text-ink-200">Point <code class="font-mono text-xs bg-ink-800 px-1.5 py-0.5 rounded">UOA_DOMAIN</code> at your admin hostname and set your TURN host.</div>
+						</div>
+						<div class="flex gap-4">
+							<div class="shrink-0 h-7 w-7 rounded-full bg-accent-500/10 border border-accent-500/20 text-accent-400 text-sm font-semibold flex items-center justify-center">3</div>
+							<div class="text-sm text-ink-200">Bring everything up — Caddy provisions TLS, Postgres initializes itself.</div>
+						</div>
+						<div class="flex gap-4">
+							<div class="shrink-0 h-7 w-7 rounded-full bg-accent-500/10 border border-accent-500/20 text-accent-400 text-sm font-semibold flex items-center justify-center">4</div>
+							<div class="text-sm text-ink-200">Open the admin UI, complete SSO, and enroll your first device.</div>
+						</div>
+					</div>
+				</div>
+				<div class="rounded-2xl border border-ink-800 bg-ink-950 shadow-2xl shadow-black/50">
+					<div class="flex items-center gap-1.5 px-4 py-2.5 border-b border-ink-800">
+						<span class="h-2.5 w-2.5 rounded-full bg-ink-700"></span>
+						<span class="h-2.5 w-2.5 rounded-full bg-ink-700"></span>
+						<span class="h-2.5 w-2.5 rounded-full bg-ink-700"></span>
+						<span class="ml-2 text-[10px] tracking-wider text-ink-500 font-mono">~/silkie</span>
+					</div>
+<pre class="font-mono text-[12.5px] leading-6 text-ink-200 p-5 overflow-auto"><span class="text-ink-500"># clone and configure</span>
+<span class="text-accent-400">git</span> clone https://github.com/rafiki270/silkie.git
+<span class="text-accent-400">cd</span> silkie
+<span class="text-accent-400">cp</span> .env.example .env
+
+<span class="text-ink-500"># bring up the whole stack</span>
+<span class="text-accent-400">docker</span> compose up -d
+
+<span class="text-ink-500"># enroll your first device</span>
+<span class="text-accent-400">npm</span> install -g silkie
+<span class="text-accent-400">silkie</span> enroll
+</pre>
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<section id="docs" class="border-t border-ink-800 bg-ink-900/40">
+		<div class="max-w-6xl mx-auto px-6 py-20 md:py-28">
+			<div class="max-w-2xl">
+				<div class="text-xs font-semibold uppercase tracking-widest text-accent-500">Documentation</div>
+				<h2 class="mt-3 text-3xl md:text-4xl font-bold tracking-tight">Read the design, not just the README.</h2>
+			</div>
+			<div class="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+				<a href="https://github.com/rafiki270/silkie/blob/main/docs/brief.md" class="group rounded-xl border border-ink-800 hover:border-ink-600 bg-ink-900 p-6 transition">
+					<div class="font-semibold group-hover:text-accent-400 transition">System brief</div>
+					<p class="mt-2 text-sm text-ink-300">Data models, API surface, and full system design.</p>
+				</a>
+				<a href="https://github.com/rafiki270/silkie/blob/main/docs/frameworks.md" class="group rounded-xl border border-ink-800 hover:border-ink-600 bg-ink-900 p-6 transition">
+					<div class="font-semibold group-hover:text-accent-400 transition">Component architecture</div>
+					<p class="mt-2 text-sm text-ink-300">SDK design, auth flows, and framework choices.</p>
+				</a>
+				<a href="https://github.com/rafiki270/silkie/blob/main/docs/cli.md" class="group rounded-xl border border-ink-800 hover:border-ink-600 bg-ink-900 p-6 transition">
+					<div class="font-semibold group-hover:text-accent-400 transition">CLI daemon</div>
+					<p class="mt-2 text-sm text-ink-300">How the on-device agent runs and stays connected.</p>
+				</a>
+				<a href="https://github.com/rafiki270/silkie/blob/main/docs/mobile.md" class="group rounded-xl border border-ink-800 hover:border-ink-600 bg-ink-900 p-6 transition">
+					<div class="font-semibold group-hover:text-accent-400 transition">Mobile apps</div>
+					<p class="mt-2 text-sm text-ink-300">Native iOS and Android app specification.</p>
+				</a>
+				<a href="https://github.com/rafiki270/silkie/blob/main/docs/sso.md" class="group rounded-xl border border-ink-800 hover:border-ink-600 bg-ink-900 p-6 transition">
+					<div class="font-semibold group-hover:text-accent-400 transition">SSO</div>
+					<p class="mt-2 text-sm text-ink-300">Authentication with UnlikeOtherAuthenticator.</p>
+				</a>
+				<a href="https://github.com/rafiki270/silkie/blob/main/docs/techstack.md" class="group rounded-xl border border-ink-800 hover:border-ink-600 bg-ink-900 p-6 transition">
+					<div class="font-semibold group-hover:text-accent-400 transition">Tech stack</div>
+					<p class="mt-2 text-sm text-ink-300">Libraries and dependency choices.</p>
+				</a>
+			</div>
+		</div>
+	</section>
+
+	<footer class="border-t border-ink-800">
+		<div class="max-w-6xl mx-auto px-6 py-10 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-ink-400">
+			<div class="flex items-center gap-3">
+				<img src="../assets/icon-1024.png" alt="" class="h-7 w-7 rounded-md" />
+				<span>&copy; 2026 <a href="https://unlikeotherai.com" class="hover:text-white transition">UnlikeOtherAI Ltd</a> · Apache 2.0</span>
+			</div>
+			<div class="flex items-center gap-6">
+				<a href="https://github.com/rafiki270/silkie" class="hover:text-white transition">GitHub</a>
+				<a href="https://github.com/rafiki270/silkie/blob/main/LICENSE" class="hover:text-white transition">License</a>
+				<a href="https://www.wireguard.com/" class="hover:text-white transition">WireGuard</a>
+			</div>
+		</div>
+		<div class="max-w-6xl mx-auto px-6 pb-8 text-xs text-ink-500">
+			WireGuard is a registered trademark of Jason A. Donenfeld. Silkie is not affiliated with or endorsed by the WireGuard project.
+		</div>
+	</footer>
+</body>
+</html>

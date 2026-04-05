@@ -1,1 +1,27 @@
 .env
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# build artifacts
+bin/
+dist/
+/silkie
+/control-server
+
+# test / coverage
+coverage.out
+coverage.html
+*.test
+*.prof
+
+# node (for web tooling)
+node_modules/
+.pnpm-store/

@@ -1,0 +1,23 @@
+# generated / vendored
+vendor/
+node_modules/
+dist/
+build/
+bin/
+
+# not ours to reformat
+docs/
+migrations/
+ops/Caddyfile
+Caddyfile
+LICENSE
+go.sum
+
+# binary / asset files
+assets/
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.ico
+*.svg
