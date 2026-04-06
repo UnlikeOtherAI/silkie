@@ -34,6 +34,7 @@ type Config struct {
 	LogLevel                 string
 	OTELExporterOTLPEndpoint string
 	OPAEndpoint              string
+	DevMode                  bool
 }
 
 // Load reads all configuration from environment variables with sensible defaults.
@@ -65,6 +66,7 @@ func Load() Config {
 		LogLevel:                 getenv("LOG_LEVEL", "info"),
 		OTELExporterOTLPEndpoint: os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"),
 		OPAEndpoint:              os.Getenv("OPA_ENDPOINT"),
+		DevMode:                  getenvBool("DEV_MODE", false),
 	}
 }
 
@@ -99,5 +101,17 @@ func getenvInt(key string, fallback int) int {
 		return fallback
 	}
 
+	return parsed
+}
+
+func getenvBool(key string, fallback bool) bool {
+	value := os.Getenv(key)
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		return fallback
+	}
 	return parsed
 }
