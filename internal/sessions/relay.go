@@ -46,12 +46,13 @@ func (h *Handler) handleRelayCredentials(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Validate the session exists and belongs to the requester.
+	// Validate the session exists, belongs to the requester, and is in an operable state.
 	var targetDeviceID string
 	err := h.db.Pool.QueryRow(
 		r.Context(),
 		`select target_device_id from connect_sessions
-		 where id = $1 and requester_user_id = $2`,
+		 where id = $1 and requester_user_id = $2
+		   and status not in ('denied', 'closed', 'expired', 'failed')`,
 		sessionID,
 		claims.Sub,
 	).Scan(&targetDeviceID)

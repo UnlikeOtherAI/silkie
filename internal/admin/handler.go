@@ -141,6 +141,11 @@ func (h *Handler) handleSystemInfo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !claims.IsSuper {
+		writeError(w, http.StatusForbidden, "super-user access required")
+		return
+	}
+
 	info := map[string]any{
 		"version":          "0.1.0",
 		"overlay_cidr":     h.cfg.WGOverlayCIDR,
