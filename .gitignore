@@ -25,3 +25,4 @@ coverage.html
 # node (for web tooling)
 node_modules/
 .pnpm-store/
+restore-services.sh

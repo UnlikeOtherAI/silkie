@@ -37,6 +37,10 @@ func (h *Handler) Mount(r chi.Router) {
 	})
 	r.Get("/login", h.serveLogin)
 
+	// Serve static assets (icons, images).
+	fileServer := http.FileServer(http.Dir("assets"))
+	r.Handle("/assets/*", http.StripPrefix("/assets", fileServer))
+
 	// Admin API endpoints require auth and super-user status.
 	r.Group(func(r chi.Router) {
 		r.Use(auth.Middleware(h.cfg))

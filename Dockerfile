@@ -16,6 +16,7 @@ RUN apk add --no-cache ca-certificates tzdata
 COPY --from=build /silkie-server /usr/local/bin/silkie-server
 COPY migrations /app/migrations
 COPY admin /app/admin
+COPY assets /app/assets
 
 WORKDIR /app
 EXPOSE 8080

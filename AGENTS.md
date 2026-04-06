@@ -30,6 +30,21 @@ Do not run `find`, `ls`, or `cat` on any path above this directory.
 Never use `apply_patch`. Write all files with shell commands (tee, printf,
 or cat with heredoc).
 
+## GCP Safety — MANDATORY
+
+**NEVER disable a GCP API.** Disabling an API permanently deletes all resources it manages. On 2026-04-06, disabling Cloud Run API wiped 38 production services from the UnlikeOtherAI project.
+
+Destructive GCP commands that require explicit user confirmation before execution:
+- `gcloud services disable ...`
+- `gcloud run services delete ...`
+- `gcloud sql instances delete ...`
+- `gcloud sql databases delete ...`
+- `gcloud artifacts repositories delete ...`
+- `gcloud projects delete ...`
+- `gcloud billing projects unlink ...`
+
+If billing issues block a deploy, re-enable billing — never toggle APIs.
+
 ## Key docs
 
 - System design: `docs/brief.md`
