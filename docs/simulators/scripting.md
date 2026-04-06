@@ -182,13 +182,10 @@ The name is editable from any tab. Changes are saved on blur or Enter.
 
 ### Recording feedback on the stream
 
-While recording, a canvas overlay on the stream viewport renders:
-
-- **Tap**: translucent red ring at tap position, expanding from 10px to 40px
-  over 300ms, opacity 0.6 → 0.0. Colour: `#FF3B30` at 60% opacity.
-- **Swipe/Scroll**: a 3px red trail following the pointer from start to end,
-  fading out over 500ms after pointer up.
-- **Text**: no stream overlay; captured in the sidebar text field.
+While recording, a canvas overlay on the stream viewport renders the same
+visual indicators defined in the Visual Overlay Specification below. Recording
+feedback and preview/Final Record use identical overlay rendering — there is
+no separate recording-only visual style.
 
 The recording indicator (pulsing red border around the stream) uses:
 ```css
@@ -219,9 +216,9 @@ The timeline is the core editing interface. Each step is rendered as a
   hover, `grabbing` during drag.
 - **Type icon**: `●` tap (filled circle in `tap_color`), `↗` swipe, `↕`
   scroll, `⌨` text, `⏎` key, `◻` wait.
-- **Coordinates or value**: tap shows `(x, y)`, swipe shows `→ dx, dy`,
-  scroll shows `↑↓ delta`, text shows `"first 20 chars…"`, wait shows
-  `duration_ms`.
+- **Coordinates or value**: tap shows `(x, y)`, swipe shows
+  `(x1,y1)→(x2,y2)`, scroll shows `(x,y) ↕ delta_y`, text shows
+  `"first 20 chars…"`, key shows the key name, wait shows `duration_ms`.
 - **Label**: truncated with ellipsis if > 20 chars in collapsed view.
 - **Delay badge**: rounded pill showing `delay_before_ms` value. Light grey
   background. Click to edit inline.
@@ -256,6 +253,11 @@ any other.
 │                                                          │
 └──────────────────────────────────────────────────────────┘
 ```
+
+All block types share the following common fields in addition to their
+type-specific fields shown below: Label, Delay before (ms), Recorded at
+(read-only), Enabled checkbox, and [Duplicate] / [Insert before] /
+[Insert after] buttons. These are not repeated in each type-specific example.
 
 For swipe blocks, the expanded view adds:
 ```
@@ -308,7 +310,8 @@ a strikethrough on the label. The step is skipped during replay.
 | Drag over valid drop zone | Drop line turns solid blue, gap between blocks opens to 8px |
 | Error (failed during replay) | Red left accent bar, red background tint `rgba(255,0,0,0.05)`, error icon replaces type icon |
 | Currently executing (replay) | Pulsing blue left accent bar, slight blue background tint |
-| Disabled (idb unavailable) | 50% opacity, no pointer events |
+| Step disabled (`enabled: false`) | 50% opacity, strikethrough on label. Stacks with other states (e.g. selected + disabled) |
+| UI disabled (idb unavailable) | 50% opacity on all blocks, no pointer events, grey banner shown |
 
 ### Clicking a block highlights on stream
 
@@ -348,6 +351,9 @@ transitions).
 indicator on the stream, clicking elsewhere on the stream viewport updates the
 block's coordinates to the clicked position (same as "Re-pick" but implicit).
 This lets the user click a block, then click the stream to reposition it.
+Stream clicks during Timeline editing (including pick mode and implicit re-pick)
+are **not** forwarded to the simulator — they only update coordinates. The stream
+is non-interactive during timeline editing to prevent accidental navigation.
 
 ---
 
@@ -415,8 +421,26 @@ A dropdown anchored to the insert point:
 └─────────────────┘
 ```
 
-Selecting a type inserts a new block at that position with default values and
-immediately expands it for editing. For Tap, the stream enters single-click
+Selecting a type inserts a new block at that position and immediately expands
+it for editing. Default values for new steps:
+
+| Field | Default |
+|-------|---------|
+| `label` | `""` (empty) |
+| `delay_before_ms` | `0` |
+| `recorded_at_ms` | `0` (displays "Manual") |
+| `enabled` | `true` |
+| `tap_color` | from `settings.default_tap_color` |
+| `tap_size` | from `settings.default_tap_size` |
+| `tap_animation` | from `settings.default_tap_animation` |
+| `swipe_color` | from `settings.default_swipe_color` |
+| `scroll_color` | from `settings.default_swipe_color` |
+| `duration_ms` (swipe/scroll) | `300` |
+| `duration_ms` (wait) | `1000` |
+| `text` | `""` (empty, expanded for immediate editing) |
+| `key_code` | `"return"` |
+
+For Tap, the stream enters single-click
 pick mode: the next click sets `(x, y)` and pick mode exits. For Swipe, the
 stream enters two-click pick mode: the first click sets `start_x/start_y`,
 the second click sets `end_x/end_y`, then pick mode exits. A step counter
@@ -549,6 +573,11 @@ When the user clicks [Re-pick] (or [Re-pick start] / [Re-pick end] for swipe):
   Play again.
 - **Stop**: aborts execution. The simulator remains in its current state.
   Sends `DELETE /script/{udid}/run`.
+- **Tab switching during playback**: switching to the Timeline tab while
+  preview is playing or paused does not abort the run. The step list in
+  the Preview tab continues updating in the background. However, editing
+  any step in the Timeline tab while a run is active aborts the current
+  run automatically (the executor cannot safely apply mid-flight edits).
 - **Speed**: affects the `delay_before_ms` between steps only (not swipe/scroll
   `duration_ms`). At 2x, delays are halved. At 0.5x, delays are doubled.
 - **Progress bar**: shows elapsed time vs estimated total. Not scrubbable (you
@@ -583,7 +612,7 @@ icon and a brief error message. Execution halts. The user can:
 | Final radius | `tap_size / 2` px |
 | Expand duration | 150ms, `ease-out` |
 | Hold at final size | 100ms |
-| Fade out | 250ms, opacity 1.0 → 0.0 |
+| Fade out | 250ms, opacity 0.6 → 0.0 |
 | Total visible time | 500ms |
 | Opacity at peak | 0.6 |
 | Z-order | Above stream, below any UI chrome |
@@ -647,7 +676,7 @@ icon and a brief error message. Execution halts. The user can:
 | Text colour | white |
 | Font | 11px system sans-serif, medium weight |
 | Max width | 200px (truncate with ellipsis) |
-| Duration | Same as the parent indicator |
+| Duration | Full lifespan of the parent indicator (tap: 500ms; swipe/scroll: `duration_ms` + 400ms fade) |
 
 ---
 
@@ -690,7 +719,7 @@ interface Script {
     default_tap_color: string;   // CSS hex, e.g. "#FF3B30"
     default_tap_size: number;    // logical px diameter, e.g. 40
     default_tap_animation: "ripple" | "pulse" | "none";
-    default_swipe_color: string;
+    default_swipe_color: string;   // also used as default for scroll_color
     auto_wait_threshold_ms: number; // default 500
     playback_speed: number;         // 0.5, 1, 2
   };
@@ -846,7 +875,7 @@ The server receives the `Script` object as a `POST /script/{udid}/run` request.
 The response includes a `run_id` (UUID) that identifies this execution:
 
 ```json
-{ "run_id": "a1b2c3d4-...", "status": "started", "total_steps": 12 }
+{ "run_id": "a1b2c3d4-...", "status": "started", "total_steps": 12, "start_from_step": 0 }
 ```
 
 The client connects to the SSE stream at `GET /script/{udid}/events?run_id={run_id}`
@@ -879,9 +908,11 @@ Request body for `POST /script/{udid}/run`:
 }
 ```
 
-When `start_from_step` is set, steps before that index are skipped (no
-execution, no SSE events). This is used to resume after a failed step —
-the client sets `start_from_step` to the index of the failed step.
+When `start_from_step` is set, steps before that index emit
+`script.progress` with `status: "skipped"` immediately (no execution, no
+delay). This lets reconnecting clients distinguish intentionally skipped
+steps from steps not yet reached. The run response also includes
+`start_from_step` so the client knows the effective start index.
 
 SSE event types:
 
@@ -1099,7 +1130,7 @@ typedef struct {
   double opacity;
   int duration_ms;
   int animation;    // 0=none, 1=expand, 2=trace, 3=fade, 4=pulse, 5=rotate
-  const char* text; // for type=3 (text pill) — label content, NULL otherwise
+  const char* text; // for type=3 — owned by shapes array, freed by sc_shapes_free
   int font_size;    // for type=3 — logical px
   int dashed;       // for type=1 — 0=solid, 1=dashed
   double arrow_size; // for type=5 — arrow head size in px
@@ -1118,6 +1149,7 @@ typedef void (*sc_event_callback)(const char* event_json, void* user_data);
 sc_scheduler* sc_scheduler_create(sc_timeline* t, double speed);
 void          sc_scheduler_free(sc_scheduler* s);
 int           sc_scheduler_start(sc_scheduler* s,
+                                  int start_from_step,
                                   sc_step_callback on_dispatch,
                                   sc_event_callback on_event,
                                   void* user_data);
@@ -1125,6 +1157,7 @@ int           sc_scheduler_pause(sc_scheduler* s);
 int           sc_scheduler_resume(sc_scheduler* s);
 int           sc_scheduler_abort(sc_scheduler* s);
 int           sc_scheduler_step_forward(sc_scheduler* s);
+int           sc_scheduler_set_speed(sc_scheduler* s, double speed);
 
 // --- Memory management ---
 void          sc_string_free(char* s);  // Free any char* returned by the API
