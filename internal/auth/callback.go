@@ -2,17 +2,27 @@ package auth
 
 import (
 	"context"
+	crand "crypto/rand"
+	"encoding/json"
+	"errors"
+	"io"
+	"math/big"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/jackc/pgx/v5"
 	"go.uber.org/zap"
 
 	"github.com/unlikeotherai/selkie/internal/audit"
 	"github.com/unlikeotherai/selkie/internal/config"
 	"github.com/unlikeotherai/selkie/internal/store"
 )
+
+const mobileHandoffTTL = 60 * time.Second
 
 // CallbackHandler handles the OAuth callback from UOA, upserting the user and issuing a session JWT.
 type CallbackHandler struct {
@@ -32,6 +42,8 @@ func (h *CallbackHandler) Mount(r chi.Router) {
 	r.Get("/auth/uoa-config", h.ServeUOAConfig)
 	r.Get("/auth/login", h.ServeLogin)
 	r.Get("/auth/callback", h.ServeCallback)
+	r.Get("/auth/mobile/callback", h.ServeMobileCallback)
+	r.Post("/api/v1/mobile/handoff/exchange", h.ServeMobileHandoffExchange)
 	r.Get("/auth/dev-status", h.ServeDevStatus)
 	r.Get("/auth/dev-login", h.ServeDevLogin)
 }
@@ -43,37 +55,13 @@ func (*CallbackHandler) ServeLogin(w http.ResponseWriter, r *http.Request) {
 
 // ServeCallback processes the OAuth callback, exchanges the code, upserts the user, and redirects with a JWT.
 func (h *CallbackHandler) ServeCallback(w http.ResponseWriter, r *http.Request) {
-	code := r.URL.Query().Get("code")
-	if code == "" {
-		http.Error(w, "missing code", http.StatusBadRequest)
-		return
-	}
-
-	uoaClaims, err := ExchangeCode(r.Context(), code)
+	userID, isSuper, uoaClaims, err := h.exchangeAndUpsertUser(r.Context(), r.URL.Query().Get("code"))
 	if err != nil {
-		http.Error(w, "auth failed", http.StatusUnauthorized)
+		h.writeExchangeError(w, err)
 		return
 	}
 
-	userID, isSuper, err := h.upsertUser(r.Context(), uoaClaims)
-	if err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-
-	if h.audit != nil {
-		if auditErr := h.audit.Log(r.Context(), audit.Event{
-			ActorUserID: &userID,
-			Action:      "user.login",
-			Outcome:     "success",
-			TargetTable: "users",
-			TargetID:    &userID,
-			RemoteIP:    audit.RemoteAddr(r),
-			UserAgent:   r.UserAgent(),
-		}); auditErr != nil {
-			h.logger.Error("audit user.login", zap.Error(auditErr))
-		}
-	}
+	h.auditLogin(r.Context(), r, userID)
 
 	email := uoaClaims.Email
 	displayName := uoaClaims.DisplayName
@@ -89,6 +77,178 @@ func (h *CallbackHandler) ServeCallback(w http.ResponseWriter, r *http.Request) 
 	http.Redirect(w, r, "/admin#token="+token, http.StatusFound)
 }
 
+// ServeMobileCallback exchanges the upstream auth code and redirects with a short-lived one-time handoff code.
+func (h *CallbackHandler) ServeMobileCallback(w http.ResponseWriter, r *http.Request) {
+	userID, _, _, err := h.exchangeAndUpsertUser(r.Context(), r.URL.Query().Get("code"))
+	if err != nil {
+		h.writeExchangeError(w, err)
+		return
+	}
+
+	h.auditLogin(r.Context(), r, userID)
+
+	handoffCode, err := h.createMobileHandoffCode(r.Context(), userID)
+	if err != nil {
+		if h.logger != nil {
+			h.logger.Error("create mobile handoff code", zap.Error(err), zap.String("user_id", userID))
+		}
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	redirectURL, err := mobileRedirectURL(h.cfg.MobileRedirectURL, handoffCode, r.URL.Query().Get("state"))
+	if err != nil {
+		if h.logger != nil {
+			h.logger.Error("build mobile redirect url", zap.Error(err))
+		}
+		http.Error(w, "mobile redirect is misconfigured", http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, redirectURL, http.StatusFound)
+}
+
+// ServeMobileHandoffExchange consumes a one-time handoff code and returns a Selkie session token.
+func (h *CallbackHandler) ServeMobileHandoffExchange(w http.ResponseWriter, r *http.Request) {
+	if h.db == nil || h.db.Pool == nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	var req struct {
+		HandoffCode string `json:"handoff_code"`
+	}
+	if err := decodeSingleJSONObject(r, &req); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	handoffCode := strings.TrimSpace(req.HandoffCode)
+	if handoffCode == "" {
+		writeJSONError(w, http.StatusBadRequest, "handoff_code is required")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+
+	tx, err := h.db.Pool.Begin(ctx)
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "failed to start handoff exchange")
+		return
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck // rollback is best-effort after commit
+
+	var userID, email, displayName string
+	var isSuper bool
+	err = tx.QueryRow(ctx, `
+UPDATE mobile_handoff_codes mh
+SET consumed_at = now()
+FROM users u
+WHERE mh.code_hash = sha256($1::bytea)
+  AND mh.user_id = u.id
+  AND mh.consumed_at IS NULL
+  AND mh.expires_at > now()
+RETURNING u.id, u.email, u.display_name, u.is_super
+`, handoffCode).Scan(&userID, &email, &displayName, &isSuper)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeJSONError(w, http.StatusUnauthorized, "invalid mobile handoff code")
+			return
+		}
+		if h.logger != nil {
+			h.logger.Error("consume mobile handoff code", zap.Error(err))
+		}
+		writeJSONError(w, http.StatusInternalServerError, "failed to exchange mobile handoff code")
+		return
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "failed to finalize mobile handoff exchange")
+		return
+	}
+
+	token, err := h.mintToken(userID, isSuper, email, displayName, "")
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "failed to mint session token")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"token":      token,
+		"expires_in": int((24 * time.Hour).Seconds()),
+	})
+}
+
+func (h *CallbackHandler) exchangeAndUpsertUser(ctx context.Context, code string) (string, bool, *UOAClaims, error) {
+	if strings.TrimSpace(code) == "" {
+		return "", false, nil, errMissingCode
+	}
+
+	uoaClaims, err := ExchangeCode(ctx, code)
+	if err != nil {
+		return "", false, nil, errAuthFailed
+	}
+
+	userID, isSuper, err := h.upsertUser(ctx, uoaClaims)
+	if err != nil {
+		return "", false, nil, errInternal
+	}
+
+	return userID, isSuper, uoaClaims, nil
+}
+
+func (h *CallbackHandler) createMobileHandoffCode(ctx context.Context, userID string) (string, error) {
+	if h.db == nil || h.db.Pool == nil {
+		return "", errors.New("database is required")
+	}
+
+	for range 5 {
+		code, err := randomMobileHandoffCode(32)
+		if err != nil {
+			return "", err
+		}
+
+		_, err = h.db.Pool.Exec(ctx, `
+INSERT INTO mobile_handoff_codes (code_hash, user_id, expires_at)
+VALUES (sha256($1::bytea), $2, $3)
+`, code, userID, time.Now().UTC().Add(mobileHandoffTTL))
+		if err == nil {
+			return code, nil
+		}
+	}
+
+	return "", errors.New("failed to persist mobile handoff code")
+}
+
+func (h *CallbackHandler) auditLogin(ctx context.Context, r *http.Request, userID string) {
+	if h.audit == nil {
+		return
+	}
+	if auditErr := h.audit.Log(ctx, audit.Event{
+		ActorUserID: &userID,
+		Action:      "user.login",
+		Outcome:     "success",
+		TargetTable: "users",
+		TargetID:    &userID,
+		RemoteIP:    audit.RemoteAddr(r),
+		UserAgent:   r.UserAgent(),
+	}); auditErr != nil && h.logger != nil {
+		h.logger.Error("audit user.login", zap.Error(auditErr))
+	}
+}
+
+func (h *CallbackHandler) writeExchangeError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, errMissingCode):
+		http.Error(w, "missing code", http.StatusBadRequest)
+	case errors.Is(err, errAuthFailed):
+		http.Error(w, "auth failed", http.StatusUnauthorized)
+	default:
+		http.Error(w, "internal error", http.StatusInternalServerError)
+	}
+}
+
 func (h *CallbackHandler) upsertUser(ctx context.Context, claims *UOAClaims) (string, bool, error) {
 	tx, err := h.db.Pool.Begin(ctx)
 	if err != nil {
@@ -96,7 +256,6 @@ func (h *CallbackHandler) upsertUser(ctx context.Context, claims *UOAClaims) (st
 	}
 	defer tx.Rollback(ctx) //nolint:errcheck // rollback is best-effort after commit
 
-	// Check if this is the very first user.
 	var count int
 	if countErr := tx.QueryRow(ctx, "SELECT COUNT(*) FROM users").Scan(&count); countErr != nil {
 		return "", false, countErr
@@ -112,15 +271,15 @@ func (h *CallbackHandler) upsertUser(ctx context.Context, claims *UOAClaims) (st
 	var userID string
 	var isSuper bool
 	err = tx.QueryRow(ctx, `
-		INSERT INTO users (external_id, email, display_name, is_super, last_login_at)
-		VALUES ($1, $2, $3, $4, now())
-		ON CONFLICT (external_id) DO UPDATE
-			SET email = EXCLUDED.email,
-			    display_name = EXCLUDED.display_name,
-			    last_login_at = now(),
-			    updated_at = now()
-		RETURNING id, is_super
-	`, claims.Subject, email, displayName, firstUser).Scan(&userID, &isSuper)
+        INSERT INTO users (external_id, email, display_name, is_super, last_login_at)
+        VALUES ($1, $2, $3, $4, now())
+        ON CONFLICT (external_id) DO UPDATE
+            SET email = EXCLUDED.email,
+                display_name = EXCLUDED.display_name,
+                last_login_at = now(),
+                updated_at = now()
+        RETURNING id, is_super
+    `, claims.Subject, email, displayName, firstUser).Scan(&userID, &isSuper)
 	if err != nil {
 		return "", false, err
 	}
@@ -157,4 +316,72 @@ func (h *CallbackHandler) mintToken(userID string, isSuper bool, email, displayN
 	}
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, c).
 		SignedString([]byte(h.cfg.InternalSessionSecret))
+}
+
+var (
+	errMissingCode = errors.New("missing code")
+	errAuthFailed  = errors.New("auth failed")
+	errInternal    = errors.New("internal error")
+)
+
+func decodeSingleJSONObject(r *http.Request, dst any) error {
+	defer r.Body.Close()
+
+	decoder := json.NewDecoder(io.LimitReader(r.Body, 1<<20))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(dst); err != nil {
+		return err
+	}
+
+	var extra json.RawMessage
+	if err := decoder.Decode(&extra); err != io.EOF {
+		return errors.New("request body must contain a single JSON object")
+	}
+
+	return nil
+}
+
+func writeJSON(w http.ResponseWriter, status int, value any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(value) //nolint:errcheck // best-effort write to HTTP response
+}
+
+func writeJSONError(w http.ResponseWriter, status int, message string) {
+	writeJSON(w, status, map[string]string{"error": message})
+}
+
+func randomMobileHandoffCode(length int) (string, error) {
+	const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+
+	chars := make([]byte, length)
+	bound := big.NewInt(int64(len(alphabet)))
+	for i := range chars {
+		n, err := crand.Int(crand.Reader, bound)
+		if err != nil {
+			return "", err
+		}
+		chars[i] = alphabet[n.Int64()]
+	}
+
+	return string(chars), nil
+}
+
+func mobileRedirectURL(baseURL, handoffCode, state string) (string, error) {
+	if strings.TrimSpace(baseURL) == "" {
+		return "", errors.New("mobile redirect url is required")
+	}
+
+	parsed, err := url.Parse(baseURL)
+	if err != nil {
+		return "", err
+	}
+
+	query := parsed.Query()
+	query.Set("handoff_code", handoffCode)
+	if strings.TrimSpace(state) != "" {
+		query.Set("state", state)
+	}
+	parsed.RawQuery = query.Encode()
+	return parsed.String(), nil
 }

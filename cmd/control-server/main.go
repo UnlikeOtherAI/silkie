@@ -23,6 +23,7 @@ import (
 	"github.com/unlikeotherai/selkie/internal/auth"
 	"github.com/unlikeotherai/selkie/internal/config"
 	"github.com/unlikeotherai/selkie/internal/devices"
+	"github.com/unlikeotherai/selkie/internal/mobile"
 	"github.com/unlikeotherai/selkie/internal/nat"
 	"github.com/unlikeotherai/selkie/internal/overlay"
 	"github.com/unlikeotherai/selkie/internal/policy"
@@ -151,6 +152,7 @@ func runServe(ctx context.Context, cfg config.Config, logger *zap.Logger) error 
 	auth.NewCallbackHandler(db, cfg, auditor, logger).Mount(r)
 	admin.New(db, logger, cfg).Mount(r)
 	devices.New(db, logger, cfg, overlayAlloc, auditor, hub).Mount(r)
+	mobile.New(db, logger, cfg, overlayAlloc, auditor, hub).Mount(r)
 	services.New(db, logger, cfg).Mount(r)
 	sessions.New(db, rdb, logger, cfg, policyEngine).Mount(r)
 
