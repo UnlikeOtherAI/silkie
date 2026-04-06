@@ -1,21 +1,26 @@
 # Headless Multi-Recording
 
-> Spawn headless WebKit instances to execute recording scripts in parallel,
-> controllable via MCP tools. Each job returns an ID for async status polling.
+> Batch-execute recording scripts via MCP tools. Each job wraps the server-side
+> recording pipeline with job queuing, concurrency limits, and async polling.
 
 ## Overview
 
 The headless recording system enables LLMs and automation tools to batch-execute
-recording scripts without a visible browser. Each recording job:
+recording scripts without an interactive browser session. Each recording job:
 
-1. Spawns a headless WebKit instance with a configured viewport.
-2. Connects to a simulator stream.
-3. Loads and executes a recording script (from [scripting.md](scripting.md)).
-4. Composites tap/swipe/text overlays onto the stream.
-5. Writes the output video to a specified file path.
-6. Reports completion asynchronously via job status polling.
+1. Validates the script and queues the job.
+2. Calls `POST /script/{udid}/run` with `record: true` (the server-side Final
+   Record pipeline defined in [scripting.md](scripting.md#final-record)).
+3. Monitors SSE progress events from the run.
+4. On completion, returns the output file path.
 
-Multiple jobs run concurrently, limited by a configurable max concurrency.
+No browser or WebKit instance is involved. The server captures video via
+`simctl io recordVideo` (iOS) or `adb screenrecord` (Android), executes the
+script steps via idb/adb, and composites overlay indicators using ffmpeg. This
+is the same pipeline used by interactive Final Record — headless recording adds
+job management on top.
+
+Multiple jobs run concurrently, limited by configurable max concurrency.
 
 ---
 
@@ -34,18 +39,17 @@ Start a new headless recording job.
   // Required
   script: Script;               // Full script object (see scripting.md data model)
   udid: string;                 // Target simulator UDID
-  viewport: {
-    width: number;              // Logical pixels, e.g. 390
-    height: number;             // Logical pixels, e.g. 844
-  };
   output_path: string;          // Absolute path for the output video file
 
   // Optional
   create_directories?: boolean; // Create missing parent dirs (default: true)
-  output_format?: "mp4" | "webm"; // Default: "mp4"
   playback_speed?: number;      // 0.5, 1, 2 — default: 1
   overlay?: boolean;            // Composite tap/swipe overlays (default: true)
   timeout_seconds?: number;     // Max job duration before abort (default: 300)
+  viewport?: {                  // Output video resolution
+    width: number;              // Pixels, e.g. 390 — default: simulator logical width
+    height: number;             // Pixels, e.g. 844 — default: simulator logical height
+  };
 }
 ```
 
@@ -54,6 +58,7 @@ Start a new headless recording job.
 ```typescript
 {
   job_id: string;               // UUID — use to poll status
+  run_id: string;               // Script execution run_id (from POST /script/{udid}/run)
   status: "queued";
   message: "Recording job queued";
 }
@@ -66,8 +71,10 @@ Start a new headless recording job.
 | `invalid_script` | Script JSON fails validation |
 | `simulator_not_found` | UDID does not match a booted simulator |
 | `simulator_busy` | Simulator is already running a script or recording |
+| `platform_mismatch` | Script `platform` does not match target simulator platform |
 | `path_not_writable` | Output path parent exists but is not writable |
 | `max_concurrency` | All recording slots are in use — retry later |
+| `job_not_found` | Referenced job_id does not exist or has been purged |
 
 ### `selkie_headless_status`
 
@@ -86,12 +93,12 @@ Poll the status of a recording job.
 ```typescript
 {
   job_id: string;
+  run_id?: string;              // Present once the run has started
   status: "queued" | "running" | "completed" | "failed" | "aborted";
   progress?: {
     current_step: number;       // 0-indexed
     total_steps: number;
     elapsed_ms: number;
-    estimated_remaining_ms?: number;
   };
   result?: {                    // Present when status is "completed"
     output_path: string;        // Confirmed path of the written file
@@ -106,6 +113,9 @@ Poll the status of a recording job.
   };
 }
 ```
+
+**Errors:** returns `job_not_found` if the `job_id` does not exist or has been
+purged after `job_history_retention`.
 
 ### `selkie_headless_abort`
 
@@ -126,9 +136,14 @@ Cancel a running or queued recording job.
   job_id: string;
   status: "aborted";
   message: "Job aborted";
-  partial_output_path?: string; // If partial file was written
 }
 ```
+
+Aborting a running job internally calls
+`DELETE /script/{udid}/run?run_id={run_id}` to stop the server-side executor.
+The temp video file is deleted — no partial output is retained. This matches
+the failure behavior: any non-success termination (abort, failure, timeout)
+deletes the temp file.
 
 ### `selkie_headless_list`
 
@@ -149,12 +164,14 @@ List all active and recent recording jobs.
 {
   jobs: Array<{
     job_id: string;
+    run_id?: string;
     status: string;
     udid: string;
     script_name: string;
     output_path: string;
     created_at: string;         // ISO 8601
     completed_at?: string;
+    error_message?: string;     // Summary for failed jobs (avoids polling each)
   }>;
 }
 ```
@@ -163,57 +180,41 @@ List all active and recent recording jobs.
 
 ## Architecture
 
-### Headless WebKit Instance
+### Server-Side Pipeline
 
-Each recording job spawns a headless `WKWebView` process. On macOS this uses
-`WKWebViewConfiguration` with:
-
-```swift
-let config = WKWebViewConfiguration()
-config.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
-let webView = WKWebView(frame: CGRect(x: 0, y: 0,
-                                       width: viewport.width,
-                                       height: viewport.height),
-                        configuration: config)
-```
-
-The process runs without a window (no `NSWindow`). The WebView loads the stream
-client page, which connects to the simulator's stream endpoint and renders the
-video feed plus overlay canvas.
-
-### Recording Pipeline
+Headless recording is a job management layer around the existing server-side
+recording pipeline. No browser, WebView, or client-side rendering is involved.
 
 ```
-┌─────────────┐     ┌───────────────┐     ┌──────────────┐
-│  Headless    │     │  Stream       │     │  Simulator   │
-│  WKWebView   │◄────│  Proxy        │◄────│  Capture     │
-│              │     │  (WebSocket)  │     │  Service     │
-│  stream +    │     └───────────────┘     └──────────────┘
-│  overlay     │
-│  canvas      │          ┌───────────────┐
-│      │       │          │  Script       │
-│      ▼       │          │  Executor     │
-│  captureStream()        │  (step loop)  │───► idb/adb
-│      │       │          └───────────────┘
-│      ▼       │
-│  MediaRecorder           
-│      │       │
-│      ▼       │
-│  Write to    │
-│  output_path │
-└─────────────┘
+┌──────────────────┐     ┌───────────────┐     ┌──────────────┐
+│  Job Manager     │     │  Script       │     │  Simulator   │
+│  (Go service)    │────►│  Executor     │────►│  (idb/adb)   │
+│                  │     │               │     └──────────────┘
+│  • queue FIFO    │     │  POST /script/│
+│  • concurrency   │     │  {udid}/run   │     ┌──────────────┐
+│  • timeout       │     │  record: true │────►│  simctl io   │
+│  • status track  │     │               │     │  recordVideo │
+│                  │◄────│  SSE events   │     │  / adb       │
+│                  │     └───────────────┘     │  screenrecord│
+│  output_path     │                           └──────┬───────┘
+│  ← rename .tmp   │◄─────────────────────────────────┘
+└──────────────────┘     ffmpeg composite (if overlay: true)
 ```
 
-The headless WebKit instance runs two parallel operations:
+**Flow:**
 
-1. **Stream rendering**: WebSocket connection to the simulator stream, rendered
-   on a `<canvas>` element with overlay compositing.
-2. **Script execution**: the server-side executor runs the script steps via
-   `POST /script/{udid}/run` with `record: true`. SSE events drive the overlay
-   animations on the canvas.
-
-The `canvas.captureStream(30)` API feeds a `MediaRecorder` that writes the
-composited output (stream + overlays) to the specified output file.
+1. MCP tool call → Job Manager validates script (via `libscriptcore`
+   `sc_script_parse`), checks platform match, creates job in `queued` state.
+2. When a concurrency slot opens, Job Manager calls
+   `POST /script/{udid}/run` with `{ script, record: true, playback_speed }`.
+3. Job Manager subscribes to `GET /script/{udid}/events?run_id={run_id}` and
+   updates job progress from SSE events.
+4. On `script.complete`, the server returns `output_path`. Job Manager renames
+   the file from `{output_path}.tmp` to `{output_path}`.
+5. If `overlay: true`, the server composites tap/swipe indicators onto the raw
+   capture using ffmpeg before returning the output path.
+6. If `viewport` is specified and differs from the raw capture resolution, the
+   server scales the output using ffmpeg (`-vf scale=W:H`).
 
 ### Output File Handling
 
@@ -222,13 +223,19 @@ server calls `mkdir -p` on the parent directory of `output_path` before
 starting the job. If the directory cannot be created (permissions, disk full),
 the job fails immediately with `path_not_writable`.
 
-**File naming:** the output file is written atomically — first to a temporary
-file (`{output_path}.tmp`), then renamed on completion. This prevents partial
-files from appearing at the final path if the job is aborted.
+**Atomic writes:** the output file is written to `{output_path}.tmp` during
+recording, then renamed on completion. On any non-success termination (abort,
+failure, timeout), the temp file is deleted. No partial files are ever left at
+the final path.
 
 **Overwrite behavior:** if a file already exists at `output_path`, the job
 overwrites it. The MCP tool does not check for existing files — the caller is
 responsible for path uniqueness.
+
+**File access:** the output file is on the server's local filesystem. The
+caller accesses it directly if co-located, or via a separate file transfer
+mechanism (SCP, shared mount, etc.). File download via MCP is out of scope
+for v1.
 
 ### Concurrency
 
@@ -238,6 +245,7 @@ headless_recording:
   max_per_simulator: 1            # One recording per simulator at a time
   job_history_retention: "24h"    # Keep completed/failed job records
   default_timeout_seconds: 300
+  queue_timeout_seconds: 120      # Max time a job can wait in queue
 ```
 
 Jobs exceeding `max_concurrent_jobs` are queued (FIFO). Queued jobs start
@@ -258,7 +266,7 @@ the first completes.
                     └────┬────┘
                          │ slot available
                     ┌────▼────┐
-                    │ running │◄─── resume (after pause, if supported)
+                    │ running │
                     └────┬────┘
                     ┌────┼────────────┐
                ┌────▼──┐  ┌────▼───┐  ┌───▼────┐
@@ -271,34 +279,40 @@ the first completes.
 | From | To | Trigger |
 |------|----|---------|
 | — | `queued` | `selkie_headless_record` called |
-| `queued` | `running` | Concurrency slot available, headless WebKit spawned |
+| `queued` | `running` | Concurrency slot available, `POST /script/{udid}/run` called |
 | `queued` | `aborted` | `selkie_headless_abort` called |
-| `running` | `completed` | All steps executed, video written |
-| `running` | `failed` | Step error, timeout, simulator crash, write error |
+| `queued` | `failed` | Queue timeout exceeded |
+| `running` | `completed` | `script.complete` SSE event received, file renamed |
+| `running` | `failed` | `script.error` SSE event, timeout, simulator crash, write error |
 | `running` | `aborted` | `selkie_headless_abort` called |
+
+**Race condition resolution:** if a timeout fires and an abort arrives
+simultaneously, whichever transition fires first wins atomically (CAS on job
+state). The second transition is a no-op.
 
 Failed and completed jobs retain their status records for `job_history_retention`
 (default 24h), then are purged. The output file is not deleted on purge.
 
 ---
 
-## Viewport Configuration
+## Viewport / Resolution
 
-The viewport dimensions control the headless WebKit's rendering size, which
-directly determines the output video resolution.
+The `viewport` parameter controls the output video resolution. If omitted, the
+output matches the simulator's native resolution from the capture pipeline.
 
-| Viewport | Output resolution | Use case |
-|----------|-------------------|----------|
-| `390 x 844` | 390x844 | iPhone 15 (1x logical) |
-| `780 x 1688` | 780x1688 | iPhone 15 (2x Retina) |
-| `1170 x 2532` | 1170x2532 | iPhone 15 (3x full res) |
-| `360 x 800` | 360x800 | Android medium density |
-| `1080 x 2400` | 1080x2400 | Android full HD |
+When `viewport` is specified:
+- The server captures at native resolution, then scales using ffmpeg
+  (`-vf scale={width}:{height}:flags=lanczos`) as a post-processing step.
+- Aspect ratio mismatches result in letterboxing (black bars).
+- The `coordinate_mapper` in `libscriptcore` handles the mapping for overlay
+  positioning.
 
-The stream viewport inside the WebView scales the simulator feed to fill the
-canvas. If the viewport aspect ratio differs from the simulator's, the stream is
-letterboxed (black bars) — the overlay coordinates are adjusted via the
-`coordinate_mapper` in `libscriptcore`.
+| Viewport | Use case |
+|----------|----------|
+| (omitted) | Native simulator resolution |
+| `390 x 844` | iPhone 15 logical (1x) |
+| `1170 x 2532` | iPhone 15 full res (3x) |
+| `1080 x 2400` | Android full HD |
 
 ---
 
@@ -321,13 +335,12 @@ Request body for `POST /headless/jobs`:
 {
   script: Script;
   udid: string;
-  viewport: { width: number; height: number };
   output_path: string;
   create_directories: boolean;
-  output_format: "mp4" | "webm";
   playback_speed: number;
   overlay: boolean;
   timeout_seconds: number;
+  viewport?: { width: number; height: number };
 }
 ```
 
@@ -339,53 +352,54 @@ Response matches `selkie_headless_status` output format.
 
 ### Step execution failure
 
-If a step fails during headless recording, the job transitions to `failed`. The
-error includes the step index and message. No partial video is saved at
-`output_path` (the temp file is deleted). If the caller needs partial output,
-they can check `partial_output_path` in the abort response, though this is only
-available on explicit abort, not on step failure.
+If a step fails during headless recording (idb/adb error, timeout), the server
+emits `script.error` via SSE. The Job Manager transitions the job to `failed`.
+The error includes the step index and message. The temp video file is deleted.
 
 ### Simulator disconnection
 
-If the simulator stream drops during recording (reboot, crash, network), the
-headless WebKit detects the WebSocket close event. The job fails with:
+If the simulator crashes or reboots during recording, the executor emits
+`script.error`. The Job Manager transitions to `failed` with:
 
 ```json
 {
   "error": {
     "step_index": 5,
-    "message": "Simulator stream disconnected at step 5"
+    "message": "Simulator disconnected at step 5"
   }
 }
 ```
 
 ### Timeout
 
-Jobs exceeding `timeout_seconds` are aborted by the system. The status becomes
-`failed` with message `"Job timed out after {N} seconds"`. The temp file is
-deleted.
+Jobs exceeding `timeout_seconds` are aborted by the Job Manager, which calls
+`DELETE /script/{udid}/run?run_id={run_id}` to stop the executor. The status
+becomes `failed` with message `"Job timed out after {N} seconds"`. The temp
+file is deleted.
 
 ### Disk space
 
 Before starting the recording, the system checks that the output directory has
 at least 500MB of free space. If not, the job fails immediately with
-`"Insufficient disk space"`.
+`"Insufficient disk space"`. This is a floor safety net — if the disk fills
+during a long recording, the capture pipeline will fail with a write error and
+the job transitions to `failed`.
 
 ---
 
 ## Integration with libscriptcore
 
-The headless recording system uses `libscriptcore` (see
-[scripting.md](scripting.md#cross-platform-c-core-library)) for:
+The Job Manager uses `libscriptcore` (via cgo, linked as `libscriptcore.a`) for:
 
-- **`script_parser`**: validates the incoming script JSON.
-- **`step_scheduler`**: drives step execution timing and state transitions.
-- **`coordinate_mapper`**: maps between logical and canvas coordinates for the
-  configured viewport size.
-- **`overlay_geometry`**: computes overlay shapes for the canvas renderer.
+- **`script_parser`**: validates the incoming script JSON and checks platform
+  compatibility with the target simulator.
+- **`step_scheduler`**: not used directly by the Job Manager — the server-side
+  executor uses it internally.
+- **`coordinate_mapper`**: used by the ffmpeg overlay compositing step to
+  position indicators at the correct coordinates for the output resolution.
 
-The headless WebKit loads `libscriptcore.wasm` the same way the interactive
-browser client does. No additional C++ bindings are needed.
+The Job Manager does not load WASM — it links the C++ library statically via
+cgo, same as the rest of the Go server agent.
 
 ---
 
@@ -399,7 +413,6 @@ browser client does. No additional C++ bindings are needed.
   "input": {
     "script": { "version": 1, "name": "Login flow", "...": "..." },
     "udid": "ABCD-1234-EFGH-5678",
-    "viewport": { "width": 390, "height": 844 },
     "output_path": "/recordings/2026-04-06/login-flow.mp4",
     "create_directories": true
   }
@@ -410,6 +423,7 @@ Response:
 ```json
 {
   "job_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "run_id": "e23d9a01-7c4f-4821-b3e1-1a2b3c4d5e6f",
   "status": "queued",
   "message": "Recording job queued"
 }
@@ -430,12 +444,12 @@ Response (in progress):
 ```json
 {
   "job_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "run_id": "e23d9a01-7c4f-4821-b3e1-1a2b3c4d5e6f",
   "status": "running",
   "progress": {
     "current_step": 5,
     "total_steps": 12,
-    "elapsed_ms": 7200,
-    "estimated_remaining_ms": 7000
+    "elapsed_ms": 7200
   }
 }
 ```
@@ -483,3 +497,11 @@ selkie_headless_status(job_3) → queued
 - **Audio capture** — video only. Simulator audio is not captured.
 - **Webhook notifications** — completion is poll-based via MCP. SSE/webhook
   callbacks for job completion can be added in v2.
+- **File download via MCP** — output files are on the server's filesystem.
+  Callers access them directly or via SCP/shared mount.
+- **Pause/resume** — headless jobs run to completion or abort. Interactive
+  pause/resume is available in the browser UI but not exposed for headless jobs.
+- **WebM output** — v1 produces MP4 only (native output from simctl/adb +
+  ffmpeg). WebM would require a transcode pass and is deferred.
+- **Framerate control** — output framerate matches the capture pipeline
+  (typically 30fps). Custom framerate is a v2 option.
