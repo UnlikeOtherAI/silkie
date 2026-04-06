@@ -29,6 +29,7 @@ func NewCallbackHandler(db *store.DB, cfg config.Config, auditor *audit.Logger, 
 
 // Mount registers the auth routes on the given router.
 func (h *CallbackHandler) Mount(r chi.Router) {
+	r.Get("/auth/uoa-config", h.ServeUOAConfig)
 	r.Get("/auth/login", h.ServeLogin)
 	r.Get("/auth/callback", h.ServeCallback)
 	r.Get("/auth/dev-status", h.ServeDevStatus)
