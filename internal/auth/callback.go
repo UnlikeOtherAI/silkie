@@ -72,7 +72,12 @@ func (h *CallbackHandler) ServeCallback(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	token, err := h.mintToken(userID, isSuper)
+	email := uoaClaims.Email
+	displayName := uoaClaims.DisplayName
+	if displayName == "" {
+		displayName = email
+	}
+	token, err := h.mintToken(userID, isSuper, email, displayName, "")
 	if err != nil {
 		http.Error(w, "token error", http.StatusInternalServerError)
 		return
@@ -124,16 +129,22 @@ func (h *CallbackHandler) upsertUser(ctx context.Context, claims *UOAClaims) (st
 }
 
 type jwtClaims struct {
-	Sub     string `json:"sub"`
-	IsSuper bool   `json:"is_super"`
+	Sub         string `json:"sub"`
+	IsSuper     bool   `json:"is_super"`
+	Email       string `json:"email,omitempty"`
+	DisplayName string `json:"display_name,omitempty"`
+	Picture     string `json:"picture,omitempty"`
 	jwt.RegisteredClaims
 }
 
-func (h *CallbackHandler) mintToken(userID string, isSuper bool) (string, error) {
+func (h *CallbackHandler) mintToken(userID string, isSuper bool, email, displayName, picture string) (string, error) {
 	now := time.Now()
 	c := jwtClaims{
-		Sub:     userID,
-		IsSuper: isSuper,
+		Sub:         userID,
+		IsSuper:     isSuper,
+		Email:       email,
+		DisplayName: displayName,
+		Picture:     picture,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    "selkie",
 			Subject:   userID,
