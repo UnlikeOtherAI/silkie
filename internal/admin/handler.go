@@ -156,20 +156,17 @@ func (h *Handler) handleSystemInfo(w http.ResponseWriter, r *http.Request) {
 		"redis_configured": h.cfg.RedisURL != "",
 	}
 
-	// Device and session counts (only for super users).
-	if claims.IsSuper {
-		var deviceCount, sessionCount int
-		if scanErr := h.db.Pool.QueryRow(r.Context(),
-			`SELECT count(*) FROM devices WHERE status = 'active'`).Scan(&deviceCount); scanErr != nil {
-			h.logger.Error("count active devices", zap.Error(scanErr))
-		}
-		if scanErr := h.db.Pool.QueryRow(r.Context(),
-			`SELECT count(*) FROM connect_sessions WHERE status NOT IN ('closed', 'expired', 'denied')`).Scan(&sessionCount); scanErr != nil {
-			h.logger.Error("count active sessions", zap.Error(scanErr))
-		}
-		info["active_devices"] = deviceCount
-		info["active_sessions"] = sessionCount
+	var deviceCount, sessionCount int
+	if scanErr := h.db.Pool.QueryRow(r.Context(),
+		`SELECT count(*) FROM devices WHERE status = 'active'`).Scan(&deviceCount); scanErr != nil {
+		h.logger.Error("count active devices", zap.Error(scanErr))
 	}
+	if scanErr := h.db.Pool.QueryRow(r.Context(),
+		`SELECT count(*) FROM connect_sessions WHERE status NOT IN ('closed', 'expired', 'denied')`).Scan(&sessionCount); scanErr != nil {
+		h.logger.Error("count active sessions", zap.Error(scanErr))
+	}
+	info["active_devices"] = deviceCount
+	info["active_sessions"] = sessionCount
 
 	writeJSON(w, http.StatusOK, info)
 }
