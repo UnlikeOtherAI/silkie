@@ -63,8 +63,8 @@ func (a *Allocator) AllocateTx(ctx context.Context, tx pgx.Tx, deviceID string) 
 func (a *Allocator) allocateOn(ctx context.Context, q dbtx, deviceID string) (net.IP, error) {
 	const query = `
 WITH range AS (
-    SELECT ($2::inet + n)::inet AS ip
-    FROM generate_series(1, $1) AS s(n)
+    SELECT ($3::inet + n)::inet AS ip
+    FROM generate_series($1::integer, $2::integer) AS s(n)
 )
 SELECT host(r.ip)
 FROM range r
@@ -75,15 +75,13 @@ ORDER BY r.ip
 LIMIT 1
 `
 
-	ones, bits := a.cidr.Mask.Size()
-	hostBits := bits - ones
-	maxHosts := (1 << hostBits) - 2
-	if maxHosts < 1 {
-		return nil, fmt.Errorf("overlay cidr %s has no usable hosts", a.cidr.String())
+	firstOffset, lastOffset, err := deviceHostOffsetRange(a.cidr)
+	if err != nil {
+		return nil, err
 	}
 
 	var ipStr string
-	if err := q.QueryRow(ctx, query, maxHosts, a.cidr.IP.String()).Scan(&ipStr); err != nil {
+	if err := q.QueryRow(ctx, query, firstOffset, lastOffset, a.cidr.IP.String()).Scan(&ipStr); err != nil {
 		return nil, fmt.Errorf("select overlay ip: %w", err)
 	}
 
@@ -102,6 +100,21 @@ WHERE id = $2
 	}
 
 	return ip, nil
+}
+
+func deviceHostOffsetRange(cidr *net.IPNet) (int, int, error) {
+	if cidr == nil {
+		return 0, 0, errors.New("overlay allocator: nil cidr")
+	}
+
+	ones, bits := cidr.Mask.Size()
+	hostBits := bits - ones
+	maxHosts := (1 << hostBits) - 2
+	if maxHosts < 2 {
+		return 0, 0, fmt.Errorf("overlay cidr %s leaves no device addresses after reserving the server ip", cidr.String())
+	}
+
+	return 2, maxHosts, nil
 }
 
 // Release clears the overlay IP assignment for the given device.

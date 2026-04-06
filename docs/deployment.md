@@ -26,8 +26,6 @@ Internet
   +--> relay.selkie.live:51820/udp -----------> server-owned wg0 on Belgium VM
   |
   +--> relay.selkie.live:3478/udp,tcp --------> coturn on Belgium VM
-  |
-  +--> relay.selkie.live:5349/tcp ------------> coturn TLS on Belgium VM
 
 Belgium VM
   |
@@ -67,6 +65,7 @@ Runtime shape:
 - `server` uses host networking and `CAP_NET_ADMIN` so it can create and manage `wg0`
 - `coturn` uses host networking for direct UDP and TCP exposure
 - `TURN_EXTERNAL_IP` must be the VM's literal public IPv4 because coturn rejects hostnames for `--external-ip`
+- `TURN_BIND_IP` should be the VM's primary internal IPv4 so coturn binds and relays on the intended interface only
 - `cloudsql-proxy` exposes the shared PostgreSQL instance locally on `127.0.0.1:5432`
 - `redis` listens on the VM and is intended to be reusable by other internal projects later
 
@@ -112,6 +111,7 @@ API_HOST=api.selkie.live
 RELAY_HOST=relay.selkie.live
 TURN_HOST=relay.selkie.live
 TURN_EXTERNAL_IP=<vm public IPv4>
+TURN_BIND_IP=<vm primary internal IPv4>
 WG_SERVER_ENDPOINT=relay.selkie.live
 WG_SERVER_PORT=51820
 WG_INTERFACE_NAME=wg0
@@ -129,7 +129,6 @@ Internet-facing ports on the VM:
 - `443/tcp`
 - `3478/udp`
 - `3478/tcp`
-- `5349/tcp`
 - `51820/udp`
 
 Internal-only ports:
