@@ -1,0 +1,9 @@
+# Local dev overrides — exposes service ports to the host.
+# This file is auto-loaded by `docker compose up`.
+services:
+  postgres:
+    ports:
+      - "5432:5432"
+  redis:
+    ports:
+      - "6379:6379"

@@ -17,12 +17,14 @@ bin/
 
 # admin-ui build output
 admin-ui/dist/
+*.tsbuildinfo
 
 # test / coverage
 coverage.out
 coverage.html
 *.test
 *.prof
+.playwright-mcp/
 
 # node (for web tooling)
 node_modules/
