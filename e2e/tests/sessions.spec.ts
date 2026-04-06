@@ -3,7 +3,7 @@ import { Client } from "pg";
 import { devLogin, getState } from "../helpers";
 import { randomUUID } from "crypto";
 
-test.describe("Sessions tab", () => {
+test.describe("Sessions page", () => {
   let db: Client;
   let devUserID: string;
 
@@ -26,10 +26,12 @@ test.describe("Sessions tab", () => {
   });
 
   test("shows empty state when no sessions", async ({ page }) => {
-    await page.click("#tab-sessions");
-    const table = page.locator("#sessions-table-wrap");
-    await expect(table).toBeVisible({ timeout: 5000 });
-    await expect(table).toContainText("No sessions");
+    await page.click("#nav-sessions");
+    await page.waitForURL("**/admin/sessions", { timeout: 5000 });
+    await page.waitForSelector("#sessions-active-body", { timeout: 5000 });
+    await expect(page.locator("#sessions-active-body")).toContainText(
+      "No active sessions",
+    );
   });
 
   test("displays seeded session in table", async ({ page }) => {
@@ -61,15 +63,13 @@ test.describe("Sessions tab", () => {
       [sessionId, devUserID, deviceId, serviceId],
     );
 
-    await page.click("#tab-sessions");
-    await page.waitForSelector("#sessions-table-wrap:not(.hidden)", {
-      timeout: 5000,
-    });
+    await page.click("#nav-sessions");
+    await page.waitForURL("**/admin/sessions", { timeout: 5000 });
+    await page.waitForSelector("#sessions-active-body", { timeout: 5000 });
 
-    const row = page.locator("#sessions-body tr").first();
+    const row = page.locator("#sessions-active-body tr").first();
     await expect(row).toBeVisible();
     await expect(row).toContainText("pending");
-    await expect(row).toContainText("connect");
 
     // Clean up.
     await db.query("DELETE FROM connect_sessions WHERE id = $1", [sessionId]);

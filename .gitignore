@@ -12,9 +12,11 @@
 
 # build artifacts
 bin/
-dist/
 /selkie
 /control-server
+
+# admin-ui build output
+admin-ui/dist/
 
 # test / coverage
 coverage.out

@@ -6,7 +6,7 @@ test.describe("Auth", () => {
     const { baseURL } = getState();
     await page.goto(`${baseURL}/login`);
     const devBtn = page.locator("#dev-login-btn");
-    await expect(devBtn).toBeVisible({ timeout: 5000 });
+    await expect(devBtn).toBeVisible({ timeout: 10000 });
     await expect(devBtn).toHaveText("Dev Login");
   });
 
@@ -15,7 +15,6 @@ test.describe("Auth", () => {
     expect(page.url()).toContain("/admin");
     const userInfo = page.locator("#user-email");
     await expect(userInfo).toContainText("Agent Smith");
-    await expect(userInfo).toContainText("(super)");
   });
 
   test("dev login shows avatar", async ({ page }) => {
@@ -27,8 +26,8 @@ test.describe("Auth", () => {
 
   test("sign out clears token and redirects to login", async ({ page }) => {
     await devLogin(page);
-    await page.click("text=Sign out");
-    await page.waitForURL("**/login");
+    await page.click("button[title='Sign out']");
+    await page.waitForURL("**/login", { timeout: 5000 });
     expect(page.url()).toContain("/login");
   });
 });

@@ -31,15 +31,22 @@ func New(db *store.DB, logger *zap.Logger, cfg config.Config) *Handler {
 
 // Mount registers admin routes on the given router.
 func (h *Handler) Mount(r chi.Router) {
-	r.Get("/admin", h.serveAdmin)
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/admin", http.StatusFound)
 	})
-	r.Get("/login", h.serveLogin)
 
-	// Serve static assets (icons, images).
-	fileServer := http.FileServer(http.Dir("assets"))
-	r.Handle("/assets/*", http.StripPrefix("/assets", fileServer))
+	// SPA routes — all resolve to the React app's index.html.
+	r.Get("/login", h.serveSPA)
+	r.Get("/admin", h.serveSPA)
+	r.Get("/admin/*", h.serveSPA)
+
+	// Vite-built JS/CSS bundles.
+	r.Handle("/static/*", http.StripPrefix("/static",
+		http.FileServer(http.Dir("admin-ui/dist/static"))))
+
+	// Image assets (icons).
+	r.Handle("/assets/*", http.StripPrefix("/assets",
+		http.FileServer(http.Dir("assets"))))
 
 	// Admin API endpoints require auth and super-user status.
 	r.Group(func(r chi.Router) {
@@ -49,12 +56,8 @@ func (h *Handler) Mount(r chi.Router) {
 	})
 }
 
-func (*Handler) serveAdmin(w http.ResponseWriter, _ *http.Request) {
-	serveHTMLFile(w, "admin/index.html")
-}
-
-func (*Handler) serveLogin(w http.ResponseWriter, _ *http.Request) {
-	serveHTMLFile(w, "admin/login.html")
+func (*Handler) serveSPA(w http.ResponseWriter, _ *http.Request) {
+	serveHTMLFile(w, "admin-ui/dist/index.html")
 }
 
 func serveHTMLFile(w http.ResponseWriter, path string) {

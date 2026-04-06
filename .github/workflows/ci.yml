@@ -74,7 +74,7 @@ jobs:
         run: go test -race -count=1 ./...
 
   web:
-    name: web lint
+    name: web lint + build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -83,11 +83,27 @@ jobs:
         with:
           node-version: "20"
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
       - name: htmlhint
         run: npx --yes htmlhint@1.1.4 "web/**/*.html"
 
       - name: prettier check
         run: npx --yes prettier@3.3.3 --check "web/**/*.{html,css,js}"
+
+      - name: admin-ui install
+        working-directory: admin-ui
+        run: pnpm install --frozen-lockfile
+
+      - name: admin-ui typecheck
+        working-directory: admin-ui
+        run: pnpm lint
+
+      - name: admin-ui build
+        working-directory: admin-ui
+        run: pnpm build
 
   e2e:
     name: e2e tests

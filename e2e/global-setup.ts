@@ -32,6 +32,12 @@ async function globalSetup(config: FullConfig) {
   // tracking, so we skip manual migration here to avoid conflicts.
   const dbUrl = pgUrl.replace(/\/[^/]*$/, `/${dbName}`);
 
+  // Build React admin UI.
+  execFileSync("pnpm", ["build"], {
+    cwd: join(PROJECT_ROOT, "admin-ui"),
+    stdio: "pipe",
+  });
+
   // Build server binary.
   execFileSync("go", ["build", "-o", "e2e/selkie-server", "./cmd/control-server"], {
     cwd: PROJECT_ROOT,

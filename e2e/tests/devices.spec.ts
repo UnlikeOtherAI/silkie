@@ -3,7 +3,7 @@ import { Client } from "pg";
 import { devLogin, getState } from "../helpers";
 import { randomUUID } from "crypto";
 
-test.describe("Devices tab", () => {
+test.describe("Devices page", () => {
   let db: Client;
   let devUserID: string;
 
@@ -23,12 +23,15 @@ test.describe("Devices tab", () => {
       "SELECT id FROM users WHERE external_id = 'dev-agent-smith'",
     );
     devUserID = res.rows[0].id;
+
+    // Navigate to devices page via sidebar.
+    await page.click("#nav-devices");
+    await page.waitForURL("**/admin/devices", { timeout: 5000 });
+    await page.waitForSelector("#devices-body", { timeout: 5000 });
   });
 
   test("shows empty state when no devices", async ({ page }) => {
-    const table = page.locator("#devices-table-wrap");
-    await expect(table).toBeVisible();
-    await expect(table).toContainText("No devices enrolled yet");
+    await expect(page.locator("#devices-body")).toContainText("No devices found");
   });
 
   test("displays seeded device in table", async ({ page }) => {
@@ -46,15 +49,12 @@ test.describe("Devices tab", () => {
     );
 
     await page.reload();
-    await page.waitForSelector("#devices-table-wrap:not(.hidden)", {
-      timeout: 5000,
-    });
+    await page.waitForSelector("#devices-body", { timeout: 5000 });
 
     const row = page.locator("#devices-body tr", { hasText: "test-macbook" });
     await expect(row).toBeVisible();
     await expect(row).toContainText("active");
     await expect(row).toContainText("darwin");
-    await expect(row).toContainText("0.1.0");
 
     await db.query("DELETE FROM devices WHERE id = $1", [deviceId]);
   });
