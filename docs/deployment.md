@@ -1,6 +1,6 @@
 # Deployment
 
-This document defines the production deployment model for the Silkie control
+This document defines the production deployment model for the Selkie control
 plane. The baseline runtime is Docker Compose with four core services:
 PostgreSQL, Redis, coturn, and the Go server. Caddy sits in front as the TLS
 terminator and reverse proxy.
@@ -33,8 +33,8 @@ services:
     image: postgres:16
     restart: unless-stopped
     environment:
-      POSTGRES_DB: silkie
-      POSTGRES_USER: silkie
+      POSTGRES_DB: selkie
+      POSTGRES_USER: selkie
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -62,7 +62,7 @@ services:
       - .env
 
   server:
-    image: ghcr.io/unlikeotherai/silkie-server:latest
+    image: ghcr.io/unlikeotherai/selkie-server:latest
     restart: unless-stopped
     depends_on:
       - postgres
@@ -111,7 +111,7 @@ Caddy is the only TLS endpoint. The Go server listens on plain HTTP on
 `SERVER_PORT` behind it.
 
 ```caddyfile
-silkie.example.com {
+selkie.example.com {
   encode zstd gzip
 
   header {
@@ -145,7 +145,7 @@ Required secrets:
 | Variable | Purpose |
 |---|---|
 | `UOA_SHARED_SECRET` | UOA HS256 signing and verification secret |
-| `INTERNAL_SESSION_SECRET` | HS256 key for Silkie-issued internal JWTs |
+| `INTERNAL_SESSION_SECRET` | HS256 key for Selkie-issued internal JWTs |
 | `COTURN_SECRET` | TURN REST API HMAC secret shared with coturn |
 | `POSTGRES_PASSWORD` | Postgres password when Compose provisions the DB |
 
@@ -197,7 +197,7 @@ Recommended timings:
 
 ## Horizontal scaling
 
-Silkie can run multiple stateless server instances, but only if all state that
+Selkie can run multiple stateless server instances, but only if all state that
 matters outside one process is externalized.
 
 Required shared components:
@@ -217,7 +217,7 @@ multiple server instances. That means in-memory broadcast is insufficient.
 Required pattern:
 
 - The instance that creates an event publishes it to Redis:
-  `PUBLISH silkie:device:{id}:events <json-payload>`.
+  `PUBLISH selkie:device:{id}:events <json-payload>`.
 - Every server instance subscribes to the device channels for locally attached
   SSE clients.
 - The SSE handler writes the Redis event payload directly to the open stream.
@@ -282,18 +282,18 @@ Policy:
 - Patch and minor updates are downloaded in the background, then applied by the
   platform service manager restart path.
 - No forced hot-reload: the current daemon keeps running until the next
-  restart or a user-triggered `silkie service restart`.
+  restart or a user-triggered `selkie service restart`.
 
 Operationally:
 
-- macOS updater command: `npm install -g silkie@<version>`
-- Linux updater command: `npm install -g silkie@<version>`
+- macOS updater command: `npm install -g selkie@<version>`
+- Linux updater command: `npm install -g selkie@<version>`
 - Auto-update must be disabled if the package manager path is unknown or the
   install was not global.
 
 ## Version skew policy
 
-Silkie is not wire-compatible across arbitrary versions. The server defines the
+Selkie is not wire-compatible across arbitrary versions. The server defines the
 compatibility window.
 
 | Component pair | Supported skew |

@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	redis "github.com/redis/go-redis/v9"
-	"github.com/unlikeotherai/silkie/internal/config"
+	"github.com/unlikeotherai/selkie/internal/config"
 )
 
 // Redis wraps a go-redis Client for pub/sub and caching.

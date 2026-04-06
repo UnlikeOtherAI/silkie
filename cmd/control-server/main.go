@@ -1,4 +1,4 @@
-// Package main is the entry point for the silkie control-plane server.
+// Package main is the entry point for the selkie control-plane server.
 package main
 
 import (
@@ -16,17 +16,20 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
-	"github.com/unlikeotherai/silkie/internal/admin"
-	"github.com/unlikeotherai/silkie/internal/audit"
-	"github.com/unlikeotherai/silkie/internal/auth"
-	"github.com/unlikeotherai/silkie/internal/config"
-	"github.com/unlikeotherai/silkie/internal/devices"
-	"github.com/unlikeotherai/silkie/internal/overlay"
-	"github.com/unlikeotherai/silkie/internal/policy"
-	"github.com/unlikeotherai/silkie/internal/services"
-	"github.com/unlikeotherai/silkie/internal/sessions"
-	"github.com/unlikeotherai/silkie/internal/store"
-	"github.com/unlikeotherai/silkie/internal/telemetry"
+	redis "github.com/redis/go-redis/v9"
+
+	"github.com/unlikeotherai/selkie/internal/admin"
+	"github.com/unlikeotherai/selkie/internal/audit"
+	"github.com/unlikeotherai/selkie/internal/auth"
+	"github.com/unlikeotherai/selkie/internal/config"
+	"github.com/unlikeotherai/selkie/internal/devices"
+	"github.com/unlikeotherai/selkie/internal/nat"
+	"github.com/unlikeotherai/selkie/internal/overlay"
+	"github.com/unlikeotherai/selkie/internal/policy"
+	"github.com/unlikeotherai/selkie/internal/services"
+	"github.com/unlikeotherai/selkie/internal/sessions"
+	"github.com/unlikeotherai/selkie/internal/store"
+	"github.com/unlikeotherai/selkie/internal/telemetry"
 )
 
 func main() {
@@ -45,7 +48,7 @@ func runServe(ctx context.Context, cfg config.Config, logger *zap.Logger) error 
 	// Initialize OpenTelemetry (noop when endpoint is empty).
 	otelShutdown, err := telemetry.Init(ctx, telemetry.Config{
 		Endpoint:       cfg.OTELExporterOTLPEndpoint,
-		ServiceName:    "silkie-server",
+		ServiceName:    "selkie-server",
 		ServiceVersion: "0.1.0",
 	}, logger)
 	if err != nil {
@@ -85,6 +88,19 @@ func runServe(ctx context.Context, cfg config.Config, logger *zap.Logger) error 
 	// Policy engine (allow-all when OPA_ENDPOINT is empty).
 	policyEngine := policy.New(cfg.OPAEndpoint, logger)
 	_ = policyEngine // wired into session creation when policy checks are enabled
+
+	// Coturn redis-statsdb subscriber for relay allocation tracking.
+	if cfg.CoturnRedisStatsDB != "" {
+		statsOpts, err := redis.ParseURL(cfg.CoturnRedisStatsDB)
+		if err != nil {
+			return fmt.Errorf("parse coturn redis statsdb url: %w", err)
+		}
+		statsClient := redis.NewClient(statsOpts)
+		defer statsClient.Close() //nolint:errcheck
+		statsSub := nat.NewStatsSubscriber(statsClient, db, logger)
+		go statsSub.Run(ctx)
+		logger.Info("coturn statsdb subscriber started")
+	}
 
 	ready := &atomic.Bool{}
 	ready.Store(true)

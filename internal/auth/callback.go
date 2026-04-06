@@ -9,9 +9,9 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"go.uber.org/zap"
 
-	"github.com/unlikeotherai/silkie/internal/audit"
-	"github.com/unlikeotherai/silkie/internal/config"
-	"github.com/unlikeotherai/silkie/internal/store"
+	"github.com/unlikeotherai/selkie/internal/audit"
+	"github.com/unlikeotherai/selkie/internal/config"
+	"github.com/unlikeotherai/selkie/internal/store"
 )
 
 // CallbackHandler handles the OAuth callback from UOA, upserting the user and issuing a session JWT.
@@ -135,7 +135,7 @@ func (h *CallbackHandler) mintToken(userID string, isSuper bool) (string, error)
 		Sub:     userID,
 		IsSuper: isSuper,
 		RegisteredClaims: jwt.RegisteredClaims{
-			Issuer:    "silkie",
+			Issuer:    "selkie",
 			Subject:   userID,
 			IssuedAt:  jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(now.Add(24 * time.Hour)),

@@ -3,13 +3,13 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: silkie
-      POSTGRES_USER: silkie
+      POSTGRES_DB: selkie
+      POSTGRES_USER: selkie
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U silkie -d silkie"]
+      test: ["CMD-SHELL", "pg_isready -U selkie -d selkie"]
       interval: 10s
       timeout: 5s
       retries: 10

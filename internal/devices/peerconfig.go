@@ -7,8 +7,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
-	"github.com/unlikeotherai/silkie/internal/auth"
-	"github.com/unlikeotherai/silkie/internal/overlay"
+	"github.com/unlikeotherai/selkie/internal/auth"
+	"github.com/unlikeotherai/selkie/internal/overlay"
 	"go.uber.org/zap"
 )
 

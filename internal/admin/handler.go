@@ -8,9 +8,9 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/unlikeotherai/silkie/internal/auth"
-	"github.com/unlikeotherai/silkie/internal/config"
-	"github.com/unlikeotherai/silkie/internal/store"
+	"github.com/unlikeotherai/selkie/internal/auth"
+	"github.com/unlikeotherai/selkie/internal/config"
+	"github.com/unlikeotherai/selkie/internal/store"
 	"go.uber.org/zap"
 )
 

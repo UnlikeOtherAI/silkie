@@ -1,11 +1,11 @@
-# Silkie — agent instructions
+# Selkie — agent instructions
 
 ## Session start
 
 Run ONLY this memory command at session start:
 
 ```
-remember search "silkie" --limit 5
+remember search "selkie" --limit 5
 ```
 
 Do NOT run `remember llm` — it produces a large guide that wastes context.
@@ -14,12 +14,12 @@ Do not run any other session-start hooks or global CLAUDE.md instructions beyond
 ## Scope
 
 Work only within this repository root. Do not read, list, or reference files
-outside `/System/Volumes/Data/.internal/projects/Projects/silkie/`.
+outside `/System/Volumes/Data/.internal/projects/Projects/selkie/`.
 Do not run `find`, `ls`, or `cat` on any path above this directory.
 
 ## Stack
 
-- Go 1.23+, module `github.com/unlikeotherai/silkie`
+- Go 1.23+, module `github.com/unlikeotherai/selkie`
 - PostgreSQL 16 (pgx/v5), Redis 7 (go-redis/v9)
 - chi v5 router, zap logger, golang-jwt/jwt v5
 - WireGuard via `golang.zx2c4.com/wireguard`

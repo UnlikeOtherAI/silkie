@@ -3,10 +3,10 @@
 <head>
 	<meta charset="utf-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1" />
-	<title>Silkie — Self-hosted zero-trust access layer</title>
-	<meta name="description" content="Silkie is a self-hosted management and administration layer for a WireGuard-based zero-trust overlay network. Device enrollment, session brokering, STUN/TURN-assisted NAT traversal, and a clean admin UI." />
+	<title>Selkie — Self-hosted zero-trust access layer</title>
+	<meta name="description" content="Selkie is a self-hosted management and administration layer for a WireGuard-based zero-trust overlay network. Device enrollment, session brokering, STUN/TURN-assisted NAT traversal, and a clean admin UI." />
 	<link rel="icon" type="image/png" href="/assets/app-icon.png" />
-	<meta property="og:title" content="Silkie — Self-hosted zero-trust access layer" />
+	<meta property="og:title" content="Selkie — Self-hosted zero-trust access layer" />
 	<meta property="og:description" content="Device enrollment, session brokering, and NAT traversal for a WireGuard overlay you control." />
 	<meta property="og:image" content="/assets/app-icon.png" />
 	<meta property="og:type" content="website" />
@@ -62,7 +62,7 @@
 		<div class="max-w-6xl mx-auto flex items-center justify-between px-6 h-16">
 			<a href="#top" class="flex items-center gap-3">
 				<img src="../assets/app-icon.png" alt="" class="h-8 w-8 rounded-lg" />
-				<span class="font-semibold tracking-tight">Silkie</span>
+				<span class="font-semibold tracking-tight">Selkie</span>
 			</a>
 			<nav class="hidden md:flex items-center gap-8 text-sm text-ink-300">
 				<a href="#features" class="hover:text-white transition">Features</a>
@@ -70,7 +70,7 @@
 				<a href="#quickstart" class="hover:text-white transition">Quick start</a>
 				<a href="#docs" class="hover:text-white transition">Docs</a>
 			</nav>
-			<a href="https://github.com/rafiki270/silkie" class="inline-flex items-center gap-2 text-sm font-medium rounded-lg border border-ink-700 hover:border-ink-500 px-3 py-1.5 transition">
+			<a href="https://github.com/unlikeotherai/selkie" class="inline-flex items-center gap-2 text-sm font-medium rounded-lg border border-ink-700 hover:border-ink-500 px-3 py-1.5 transition">
 				<svg viewBox="0 0 24 24" fill="currentColor" class="h-4 w-4" aria-hidden="true"><path d="M12 .5C5.73.5.75 5.48.75 11.75c0 4.98 3.23 9.2 7.72 10.7.57.1.78-.25.78-.55v-2c-3.14.68-3.8-1.34-3.8-1.34-.51-1.3-1.25-1.65-1.25-1.65-1.02-.7.08-.68.08-.68 1.13.08 1.73 1.16 1.73 1.16 1 1.73 2.64 1.23 3.28.94.1-.73.4-1.23.72-1.51-2.5-.28-5.13-1.25-5.13-5.58 0-1.23.44-2.24 1.16-3.03-.12-.28-.5-1.44.11-3 0 0 .94-.3 3.08 1.16.9-.25 1.86-.38 2.82-.38.96 0 1.93.13 2.83.38 2.14-1.46 3.08-1.16 3.08-1.16.61 1.56.23 2.72.11 3 .72.79 1.15 1.8 1.15 3.03 0 4.34-2.64 5.29-5.15 5.57.4.35.77 1.05.77 2.12v3.14c0 .3.2.66.79.55 4.48-1.5 7.71-5.72 7.71-10.7C23.25 5.48 18.27.5 12 .5z"/></svg>
 				GitHub
 			</a>
@@ -80,7 +80,7 @@
 	<section id="top" class="grid-bg relative overflow-hidden">
 		<div class="max-w-6xl mx-auto px-6 pt-24 pb-20 md:pt-32 md:pb-28">
 			<div class="flex flex-col items-center text-center">
-				<img src="../assets/app-icon.png" alt="Silkie" class="h-24 w-24 rounded-2xl shadow-2xl shadow-accent-500/10 ring-1 ring-white/10" />
+				<img src="../assets/app-icon.png" alt="Selkie" class="h-24 w-24 rounded-2xl shadow-2xl shadow-accent-500/10 ring-1 ring-white/10" />
 				<div class="mt-8 inline-flex items-center gap-2 text-xs font-medium text-accent-400 bg-accent-500/10 border border-accent-500/20 rounded-full px-3 py-1">
 					<span class="h-1.5 w-1.5 rounded-full bg-accent-500 animate-pulse"></span>
 					Self-hosted · Apache 2.0 · Built on WireGuard
@@ -90,14 +90,14 @@
 					<span class="block bg-gradient-to-r from-accent-400 to-accent-600 bg-clip-text text-transparent">on your infrastructure.</span>
 				</h1>
 				<p class="mt-6 max-w-2xl text-lg text-ink-300 leading-relaxed">
-					Silkie is a zero-trust access layer you run yourself. Enroll devices, broker peer-to-peer sessions over WireGuard, and manage everything from a clean admin UI — without handing your identity graph to a vendor.
+					Selkie is a zero-trust access layer you run yourself. Enroll devices, broker peer-to-peer sessions over WireGuard, and manage everything from a clean admin UI — without handing your identity graph to a vendor.
 				</p>
 				<div class="mt-10 flex flex-wrap items-center justify-center gap-3">
 					<a href="#quickstart" class="inline-flex items-center gap-2 bg-accent-500 hover:bg-accent-400 text-ink-950 font-semibold rounded-xl px-5 py-3 transition shadow-lg shadow-accent-500/20">
 						Get started
 						<svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M3 10a.75.75 0 0 1 .75-.75h10.638L10.23 5.29a.75.75 0 1 1 1.04-1.08l5.5 5.25a.75.75 0 0 1 0 1.08l-5.5 5.25a.75.75 0 1 1-1.04-1.08l4.158-3.96H3.75A.75.75 0 0 1 3 10Z" clip-rule="evenodd"/></svg>
 					</a>
-					<a href="https://github.com/rafiki270/silkie" class="inline-flex items-center gap-2 border border-ink-700 hover:border-ink-500 text-ink-100 font-medium rounded-xl px-5 py-3 transition">
+					<a href="https://github.com/unlikeotherai/selkie" class="inline-flex items-center gap-2 border border-ink-700 hover:border-ink-500 text-ink-100 font-medium rounded-xl px-5 py-3 transition">
 						View on GitHub
 					</a>
 				</div>
@@ -186,7 +186,7 @@
 						<span class="h-2.5 w-2.5 rounded-full bg-ink-700"></span>
 						<span class="h-2.5 w-2.5 rounded-full bg-ink-700"></span>
 						<span class="h-2.5 w-2.5 rounded-full bg-ink-700"></span>
-						<span class="ml-2 text-[10px] tracking-wider text-ink-500 font-mono">silkie topology</span>
+						<span class="ml-2 text-[10px] tracking-wider text-ink-500 font-mono">selkie topology</span>
 					</div>
 <pre class="font-mono text-[12.5px] leading-6 text-ink-200 p-5 overflow-auto"><span class="text-ink-400">┌─────────────────────────────────────────────┐</span>
 <span class="text-ink-400">│</span>  Admin UI <span class="text-ink-500">·</span> Mobile apps <span class="text-ink-500">·</span> CLI daemon     <span class="text-ink-400">│</span>
@@ -240,19 +240,19 @@
 						<span class="h-2.5 w-2.5 rounded-full bg-ink-700"></span>
 						<span class="h-2.5 w-2.5 rounded-full bg-ink-700"></span>
 						<span class="h-2.5 w-2.5 rounded-full bg-ink-700"></span>
-						<span class="ml-2 text-[10px] tracking-wider text-ink-500 font-mono">~/silkie</span>
+						<span class="ml-2 text-[10px] tracking-wider text-ink-500 font-mono">~/selkie</span>
 					</div>
 <pre class="font-mono text-[12.5px] leading-6 text-ink-200 p-5 overflow-auto"><span class="text-ink-500"># clone and configure</span>
-<span class="text-accent-400">git</span> clone https://github.com/rafiki270/silkie.git
-<span class="text-accent-400">cd</span> silkie
+<span class="text-accent-400">git</span> clone https://github.com/unlikeotherai/selkie.git
+<span class="text-accent-400">cd</span> selkie
 <span class="text-accent-400">cp</span> .env.example .env
 
 <span class="text-ink-500"># bring up the whole stack</span>
 <span class="text-accent-400">docker</span> compose up -d
 
 <span class="text-ink-500"># enroll your first device</span>
-<span class="text-accent-400">npm</span> install -g silkie
-<span class="text-accent-400">silkie</span> enroll
+<span class="text-accent-400">npm</span> install -g selkie
+<span class="text-accent-400">selkie</span> enroll
 </pre>
 				</div>
 			</div>
@@ -266,27 +266,27 @@
 				<h2 class="mt-3 text-3xl md:text-4xl font-bold tracking-tight">Read the design, not just the README.</h2>
 			</div>
 			<div class="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-				<a href="https://github.com/rafiki270/silkie/blob/main/docs/brief.md" class="group rounded-xl border border-ink-800 hover:border-ink-600 bg-ink-900 p-6 transition">
+				<a href="https://github.com/unlikeotherai/selkie/blob/main/docs/brief.md" class="group rounded-xl border border-ink-800 hover:border-ink-600 bg-ink-900 p-6 transition">
 					<div class="font-semibold group-hover:text-accent-400 transition">System brief</div>
 					<p class="mt-2 text-sm text-ink-300">Data models, API surface, and full system design.</p>
 				</a>
-				<a href="https://github.com/rafiki270/silkie/blob/main/docs/frameworks.md" class="group rounded-xl border border-ink-800 hover:border-ink-600 bg-ink-900 p-6 transition">
+				<a href="https://github.com/unlikeotherai/selkie/blob/main/docs/frameworks.md" class="group rounded-xl border border-ink-800 hover:border-ink-600 bg-ink-900 p-6 transition">
 					<div class="font-semibold group-hover:text-accent-400 transition">Component architecture</div>
 					<p class="mt-2 text-sm text-ink-300">SDK design, auth flows, and framework choices.</p>
 				</a>
-				<a href="https://github.com/rafiki270/silkie/blob/main/docs/cli.md" class="group rounded-xl border border-ink-800 hover:border-ink-600 bg-ink-900 p-6 transition">
+				<a href="https://github.com/unlikeotherai/selkie/blob/main/docs/cli.md" class="group rounded-xl border border-ink-800 hover:border-ink-600 bg-ink-900 p-6 transition">
 					<div class="font-semibold group-hover:text-accent-400 transition">CLI daemon</div>
 					<p class="mt-2 text-sm text-ink-300">How the on-device agent runs and stays connected.</p>
 				</a>
-				<a href="https://github.com/rafiki270/silkie/blob/main/docs/mobile.md" class="group rounded-xl border border-ink-800 hover:border-ink-600 bg-ink-900 p-6 transition">
+				<a href="https://github.com/unlikeotherai/selkie/blob/main/docs/mobile.md" class="group rounded-xl border border-ink-800 hover:border-ink-600 bg-ink-900 p-6 transition">
 					<div class="font-semibold group-hover:text-accent-400 transition">Mobile apps</div>
 					<p class="mt-2 text-sm text-ink-300">Native iOS and Android app specification.</p>
 				</a>
-				<a href="https://github.com/rafiki270/silkie/blob/main/docs/sso.md" class="group rounded-xl border border-ink-800 hover:border-ink-600 bg-ink-900 p-6 transition">
+				<a href="https://github.com/unlikeotherai/selkie/blob/main/docs/sso.md" class="group rounded-xl border border-ink-800 hover:border-ink-600 bg-ink-900 p-6 transition">
 					<div class="font-semibold group-hover:text-accent-400 transition">SSO</div>
 					<p class="mt-2 text-sm text-ink-300">Authentication with UnlikeOtherAuthenticator.</p>
 				</a>
-				<a href="https://github.com/rafiki270/silkie/blob/main/docs/techstack.md" class="group rounded-xl border border-ink-800 hover:border-ink-600 bg-ink-900 p-6 transition">
+				<a href="https://github.com/unlikeotherai/selkie/blob/main/docs/techstack.md" class="group rounded-xl border border-ink-800 hover:border-ink-600 bg-ink-900 p-6 transition">
 					<div class="font-semibold group-hover:text-accent-400 transition">Tech stack</div>
 					<p class="mt-2 text-sm text-ink-300">Libraries and dependency choices.</p>
 				</a>
@@ -301,13 +301,13 @@
 				<span>&copy; 2026 <a href="https://unlikeotherai.com" class="hover:text-white transition">UnlikeOtherAI Ltd</a> · Apache 2.0</span>
 			</div>
 			<div class="flex items-center gap-6">
-				<a href="https://github.com/rafiki270/silkie" class="hover:text-white transition">GitHub</a>
-				<a href="https://github.com/rafiki270/silkie/blob/main/LICENSE" class="hover:text-white transition">License</a>
+				<a href="https://github.com/unlikeotherai/selkie" class="hover:text-white transition">GitHub</a>
+				<a href="https://github.com/unlikeotherai/selkie/blob/main/LICENSE" class="hover:text-white transition">License</a>
 				<a href="https://www.wireguard.com/" class="hover:text-white transition">WireGuard</a>
 			</div>
 		</div>
 		<div class="max-w-6xl mx-auto px-6 pb-8 text-xs text-ink-500">
-			WireGuard is a registered trademark of Jason A. Donenfeld. Silkie is not affiliated with or endorsed by the WireGuard project.
+			WireGuard is a registered trademark of Jason A. Donenfeld. Selkie is not affiliated with or endorsed by the WireGuard project.
 		</div>
 	</footer>
 </body>

@@ -1,4 +1,4 @@
-// Package audit provides structured audit event logging for the silkie control plane.
+// Package audit provides structured audit event logging for the selkie control plane.
 package audit
 
 import (
@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/unlikeotherai/silkie/internal/store"
+	"github.com/unlikeotherai/selkie/internal/store"
 	"go.uber.org/zap"
 )
 

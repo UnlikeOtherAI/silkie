@@ -1,4 +1,4 @@
-silkie.example.com {
+selkie.example.com {
   encode zstd gzip
 
   header {

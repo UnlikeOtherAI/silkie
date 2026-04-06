@@ -1,4 +1,4 @@
-// Package config loads environment-based configuration for the silkie server.
+// Package config loads environment-based configuration for the selkie server.
 package config
 
 import (
@@ -21,6 +21,10 @@ type Config struct {
 	TurnHost                 string
 	TurnPort                 int
 	CoturnSecret             string
+	CoturnRealm              string
+	CoturnRedisStatsDB       string
+	CoturnCLIAddr            string
+	CoturnCLIPassword        string
 	WGOverlayCIDR            string
 	WGInterfaceName          string
 	WGServerPublicKey        string
@@ -48,6 +52,10 @@ func Load() Config {
 		TurnHost:                 os.Getenv("TURN_HOST"),
 		TurnPort:                 getenvInt("TURN_PORT", 3478),
 		CoturnSecret:             os.Getenv("COTURN_SECRET"),
+		CoturnRealm:              getenv("COTURN_REALM", "selkie"),
+		CoturnRedisStatsDB:       os.Getenv("COTURN_REDIS_STATSDB"),
+		CoturnCLIAddr:            getenv("COTURN_CLI_ADDR", "127.0.0.1:5766"),
+		CoturnCLIPassword:        os.Getenv("COTURN_CLI_PASSWORD"),
 		WGOverlayCIDR:            os.Getenv("WG_OVERLAY_CIDR"),
 		WGInterfaceName:          os.Getenv("WG_INTERFACE_NAME"),
 		WGServerPublicKey:        os.Getenv("WG_SERVER_PUBLIC_KEY"),

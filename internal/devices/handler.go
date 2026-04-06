@@ -13,11 +13,11 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
-	"github.com/unlikeotherai/silkie/internal/audit"
-	"github.com/unlikeotherai/silkie/internal/auth"
-	"github.com/unlikeotherai/silkie/internal/config"
-	"github.com/unlikeotherai/silkie/internal/overlay"
-	"github.com/unlikeotherai/silkie/internal/store"
+	"github.com/unlikeotherai/selkie/internal/audit"
+	"github.com/unlikeotherai/selkie/internal/auth"
+	"github.com/unlikeotherai/selkie/internal/config"
+	"github.com/unlikeotherai/selkie/internal/overlay"
+	"github.com/unlikeotherai/selkie/internal/store"
 	"go.uber.org/zap"
 )
 

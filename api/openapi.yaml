@@ -1,6 +1,6 @@
 openapi: "3.1.0"
 info:
-  title: Silkie Control Plane API
+  title: Selkie Control Plane API
   version: "0.1.0"
   description: |
     Self-hosted zero-trust access layer built on WireGuard.
@@ -351,7 +351,7 @@ paths:
         Opens a Server-Sent Events stream for real-time device updates.
         Sends a `connected` event on open, then `: keepalive` comments
         every 25 seconds. Session-related events are published via Redis
-        pub/sub on channel `silkie:device:{id}:events`.
+        pub/sub on channel `selkie:device:{id}:events`.
       security:
         - bearerAuth: []
       parameters:
@@ -466,7 +466,7 @@ components:
         JWT issued by the `/auth/callback` endpoint. Claims:
         - `sub` — user UUID
         - `is_super` — boolean, true for super-admin
-        - `iss` — "silkie"
+        - `iss` — "selkie"
         - `iat`, `exp` — issued/expiry timestamps (24h TTL)
 
   parameters:

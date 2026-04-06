@@ -34,9 +34,9 @@ custom URL scheme or universal/app link.
   in-app browser. No SFSafariViewController; `ASWebAuth` handles the redirect
   and returns the code to the app without exposing it to the system clipboard
   or other apps.
-- Registered URL scheme: `silkie://auth/callback`
+- Registered URL scheme: `selkie://auth/callback`
 - After the code is returned, the app performs the token exchange directly with
-  the silkie control server (`POST /v1/auth/mobile/token`), not with UOA
+  the selkie control server (`POST /v1/auth/mobile/token`), not with UOA
   directly — the server proxies the exchange and issues an internal device
   session token.
 
@@ -46,7 +46,7 @@ custom URL scheme or universal/app link.
   (`net.openid:appauth`) for the authorize redirect. Register an app link
   (`https://<domain>/auth/mobile/callback`) so Android routes the redirect
   back to the app without a chooser dialog.
-- Same token exchange as iOS against the silkie control server.
+- Same token exchange as iOS against the selkie control server.
 
 ### Token storage
 
@@ -190,7 +190,7 @@ import AppReveal
 #endif
 
 @main
-struct SilkieApp: App {
+struct SelkieApp: App {
     init() {
         #if DEBUG
         AppReveal.start()
@@ -219,10 +219,10 @@ dependencies {
 Initialise in a debug-only `Application` subclass:
 
 ```kotlin
-// src/debug/kotlin/com/silkie/app/DebugApplication.kt
+// src/debug/kotlin/com/selkie/app/DebugApplication.kt
 import com.unlikeotherai.appreveal.AppReveal
 
-class DebugApplication : SilkieApplication() {
+class DebugApplication : SelkieApplication() {
     override fun onCreate() {
         super.onCreate()
         AppReveal.start(this)
@@ -266,8 +266,8 @@ The Network Extension target follows the same Debug/Release split.
 ### iOS (`App/ios/`)
 
 ```
-Silkie/                        # Main app target
-  SilkieApp.swift
+Selkie/                        # Main app target
+  SelkieApp.swift
   Auth/
     UOAAuthSession.swift        # ASWebAuthenticationSession wrapper
     TokenStore.swift            # Keychain helpers
@@ -280,7 +280,7 @@ Silkie/                        # Main app target
     DeviceService.swift         # GET /v1/devices?role=server + polling
   Debug/
     AppRevealBootstrap.swift    # #if DEBUG only
-SilkieExtension/               # Network Extension target
+SelkieExtension/               # Network Extension target
   PacketTunnelProvider.swift
 ```
 
@@ -288,18 +288,18 @@ SilkieExtension/               # Network Extension target
 
 ```
 app/src/
-  main/kotlin/com/silkie/app/
+  main/kotlin/com/selkie/app/
     auth/
       UOAAuthActivity.kt        # Custom Tabs + AppAuth
       TokenStore.kt             # EncryptedSharedPreferences
     vpn/
-      SilkieVpnService.kt       # VpnService + GoBackend
+      SelkieVpnService.kt       # VpnService + GoBackend
       WireGuardConfig.kt        # wg_config parser
     devices/
       DeviceListFragment.kt
       DeviceViewModel.kt
       DeviceRepository.kt       # GET /v1/devices?role=server
-  debug/kotlin/com/silkie/app/
+  debug/kotlin/com/selkie/app/
     DebugApplication.kt         # AppReveal init
 ```
 

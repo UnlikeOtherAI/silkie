@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/unlikeotherai/silkie/internal/policy"
+	"github.com/unlikeotherai/selkie/internal/policy"
 	"go.uber.org/zap"
 )
 
@@ -41,7 +41,7 @@ type opaTestResponse struct {
 
 func TestEvaluate_OPAAllow(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/data/silkie/access" {
+		if r.URL.Path != "/v1/data/selkie/access" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 

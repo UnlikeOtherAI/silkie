@@ -1,6 +1,6 @@
 # Frameworks & Platform Architecture
 
-Silkie is a self-hosted zero-trust access layer composed of three runtime
+Selkie is a self-hosted zero-trust access layer composed of three runtime
 components that communicate over authenticated APIs and an encrypted WireGuard
 overlay.
 
@@ -19,7 +19,7 @@ overlay.
 └──────────────────────────┬──────────────────────────────────┘
                            │ WireGuard overlay + STUN/TURN
 ┌──────────────────────────▼──────────────────────────────────┐
-│  Silkie CLI (Node.js, runs as OS service on each device)   │
+│  Selkie CLI (Node.js, runs as OS service on each device)   │
 │  WireGuard peer · Heartbeat · Service manifest reporter    │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -114,12 +114,12 @@ CLI                         Server                       Browser
 
 ## Client SDKs
 
-Silkie exposes a connection API that lets any application initiate and manage
+Selkie exposes a connection API that lets any application initiate and manage
 peer connections through the overlay. The SDK layer is designed around a
 **C++ core library** that implements the connection logic once, with thin
 language wrappers on top.
 
-### C++ core (`libsilkie`)
+### C++ core (`libselkie`)
 
 The canonical implementation. Handles:
 
@@ -132,19 +132,19 @@ The canonical implementation. Handles:
 All other SDKs wrap this library so behavior stays consistent across
 platforms.
 
-### Node.js SDK (`@silkie/sdk`)
+### Node.js SDK (`@selkie/sdk`)
 
-Native addon wrapping `libsilkie`. Published on npm. Used by the CLI daemon
+Native addon wrapping `libselkie`. Published on npm. Used by the CLI daemon
 and available for Node.js applications that want to initiate or accept
 connections programmatically.
 
-### Swift SDK (`Silkie`)
+### Swift SDK (`Selkie`)
 
-Swift package wrapping `libsilkie` via a C bridge. Targets iOS and macOS.
+Swift package wrapping `libselkie` via a C bridge. Targets iOS and macOS.
 
-### Kotlin SDK (`silkie-android`)
+### Kotlin SDK (`selkie-android`)
 
-JNI wrapper around `libsilkie`. Targets Android and exposes a coroutines-based
+JNI wrapper around `libselkie`. Targets Android and exposes a coroutines-based
 API.
 
 ## Service manifest
@@ -155,7 +155,7 @@ this as the device's service catalog.
 
 ## Overlay network
 
-Silkie uses WireGuard as the encrypted overlay transport, but the MVP topology
+Selkie uses WireGuard as the encrypted overlay transport, but the MVP topology
 is deliberately simple: **hub-and-spoke**.
 
 ### MVP topology
@@ -180,7 +180,7 @@ itself cannot be established directly.
 
 ### AllowedIPs computation
 
-Silkie computes `AllowedIPs` differently on devices and on the server.
+Selkie computes `AllowedIPs` differently on devices and on the server.
 
 On enrolled devices:
 

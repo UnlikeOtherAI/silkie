@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/unlikeotherai/silkie/internal/audit"
-	"github.com/unlikeotherai/silkie/internal/auth"
+	"github.com/unlikeotherai/selkie/internal/audit"
+	"github.com/unlikeotherai/selkie/internal/auth"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )

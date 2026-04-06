@@ -1,6 +1,6 @@
 <div align="center">
-  <img src="assets/app-icon.png" width="130" height="130" alt="Silkie" style="border-radius: 22px;" />
-  <h1>Silkie</h1>
+  <img src="assets/app-icon.png" width="130" height="130" alt="Selkie" style="border-radius: 22px;" />
+  <h1>Selkie</h1>
   <p><strong>Self-hosted zero-trust access layer</strong></p>
   <p>
     <a href="LICENSE">Apache 2.0</a> &nbsp;·&nbsp;
@@ -11,9 +11,9 @@
 
 ---
 
-Silkie is a self-hosted management and administration layer for a [WireGuard](https://www.wireguard.com/)-based zero-trust overlay network. It provides device enrollment, session brokering, STUN/TURN-assisted NAT traversal, and a clean admin UI — wrapping the underlying WireGuard peer-to-peer protocol, which is open source and maintained independently.
+Selkie is a self-hosted management and administration layer for a [WireGuard](https://www.wireguard.com/)-based zero-trust overlay network. It provides device enrollment, session brokering, STUN/TURN-assisted NAT traversal, and a clean admin UI — wrapping the underlying WireGuard peer-to-peer protocol, which is open source and maintained independently.
 
-WireGuard is developed by Jason A. Donenfeld and released under the [GPLv2 license](https://www.wireguard.com/license/). Silkie links to WireGuard userspace implementations at runtime and does not distribute WireGuard source. See [wireguard.com](https://www.wireguard.com/) and the [WireGuard GitHub organisation](https://github.com/WireGuard) for the canonical project.
+WireGuard is developed by Jason A. Donenfeld and released under the [GPLv2 license](https://www.wireguard.com/license/). Selkie links to WireGuard userspace implementations at runtime and does not distribute WireGuard source. See [wireguard.com](https://www.wireguard.com/) and the [WireGuard GitHub organisation](https://github.com/WireGuard) for the canonical project.
 
 ---
 
@@ -23,7 +23,7 @@ WireGuard is developed by Jason A. Donenfeld and released under the [GPLv2 licen
 - Issues short-lived session tokens and brokers peer-to-peer connections via ICE/STUN/TURN
 - Exposes a service catalog — each device reports its listening ports; peers connect by overlay IP
 - Provides a single-page admin UI for device management, session history, relay health, and system status
-- Ships a Node.js CLI daemon (`silkie`) that runs as an OS service on each enrolled device
+- Ships a Node.js CLI daemon (`selkie`) that runs as an OS service on each enrolled device
 - Provides native mobile apps (iOS and Android) for connecting to enrolled servers
 
 ---
@@ -37,7 +37,7 @@ Control Server (Go 1.23+)
    Auth · Device registry · Session broker · Policy · Audit
    PostgreSQL (durable) · Redis (ephemeral)
         │ WireGuard overlay + STUN/TURN
-Silkie CLI (Node.js, runs as OS service on each device)
+Selkie CLI (Node.js, runs as OS service on each device)
    WireGuard peer · Heartbeat · Service manifest reporter
 ```
 
@@ -68,8 +68,8 @@ cp .env.example .env
 docker compose up
 
 # Enrol your first device (runs on the device being enrolled)
-npm install -g silkie
-silkie enroll
+npm install -g selkie
+selkie enroll
 ```
 
 After enrollment, open the admin UI, complete SSO login — the first login becomes the super user account.
@@ -78,10 +78,10 @@ After enrollment, open the admin UI, complete SSO login — the first login beco
 
 ## License
 
-Silkie is released under the [Apache License 2.0](LICENSE).
+Selkie is released under the [Apache License 2.0](LICENSE).
 
 Copyright 2026 [UnlikeOtherAI Ltd](https://unlikeotherai.com)
 
 **Author:** Ondrej Rafaj &lt;ondrej@unlikeotherai.com&gt;
 
-WireGuard® is a registered trademark of Jason A. Donenfeld. Silkie is not affiliated with or endorsed by the WireGuard project.
+WireGuard® is a registered trademark of Jason A. Donenfeld. Selkie is not affiliated with or endorsed by the WireGuard project.

@@ -1,4 +1,4 @@
-// Package store provides PostgreSQL and Redis persistence adapters for silkie.
+// Package store provides PostgreSQL and Redis persistence adapters for selkie.
 package store
 
 import (

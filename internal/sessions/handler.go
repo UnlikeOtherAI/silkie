@@ -13,9 +13,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
-	"github.com/unlikeotherai/silkie/internal/auth"
-	"github.com/unlikeotherai/silkie/internal/config"
-	"github.com/unlikeotherai/silkie/internal/store"
+	"github.com/unlikeotherai/selkie/internal/auth"
+	"github.com/unlikeotherai/selkie/internal/config"
+	"github.com/unlikeotherai/selkie/internal/store"
 	"go.uber.org/zap"
 )
 
@@ -250,7 +250,7 @@ func (h *Handler) handleDeviceEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	channel := fmt.Sprintf("silkie:device:%s:events", deviceID)
+	channel := fmt.Sprintf("selkie:device:%s:events", deviceID)
 	sub := h.rdb.Subscribe(r.Context(), channel)
 	defer sub.Close() //nolint:errcheck // best-effort close on SSE teardown
 
@@ -282,7 +282,7 @@ func (h *Handler) publishDeviceEvent(ctx context.Context, deviceID, eventType st
 		return
 	}
 
-	channel := fmt.Sprintf("silkie:device:%s:events", deviceID)
+	channel := fmt.Sprintf("selkie:device:%s:events", deviceID)
 
 	envelope, err := json.Marshal(map[string]any{
 		"event_type": eventType,

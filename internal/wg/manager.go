@@ -22,7 +22,7 @@ func New(interfaceName string) *Manager {
 
 // Init creates the WireGuard interface, sets its private key, address, and brings it up.
 func (m *Manager) Init(ctx context.Context, privateKey, address, listenPort string) error {
-	keyFile, err := os.CreateTemp("", "silkie-wg-private-key-*")
+	keyFile, err := os.CreateTemp("", "selkie-wg-private-key-*")
 	if err != nil {
 		zap.L().Error("create wireguard private key temp file", zap.Error(err))
 		return err

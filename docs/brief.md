@@ -171,7 +171,7 @@ management, and audit access.
 The real-time device event channel is **Server-Sent Events (SSE)** on
 `GET /v1/devices/{id}/events`. In a multi-instance deployment, session and
 device events must be fanned out through Redis pub/sub using the channel
-pattern `silkie:device:{id}:events` so any server instance can publish and any
+pattern `selkie:device:{id}:events` so any server instance can publish and any
 connected instance can stream the event to the correct device.
 
 ### 2. Identity and Auth Adapter
@@ -224,7 +224,7 @@ This subsystem manages machine identity and presence.
 * `overlay_ip`
 * `overlay_ip_reclaim_after`
 * `last_seen_at`
-* `agent_version` — silkie CLI version string
+* `agent_version` — selkie CLI version string
 
 **Hardware / OS fingerprint** (collected at enrollment, refreshed on heartbeat)
 
@@ -307,7 +307,7 @@ nodes without carrying application traffic in the normal case.
   `GET /v1/devices/{id}/events`.
 * Fan out device events through Redis pub/sub so multiple server instances can
   serve SSE clients safely, using
-  `PUBLISH silkie:device:{id}:events <json-event>`.
+  `PUBLISH selkie:device:{id}:events <json-event>`.
 * Select direct path if successful; otherwise mint relay credentials.
 * Expire idle or abandoned sessions.
 
@@ -459,7 +459,7 @@ Use two storage classes:
 * relay credential TTL state
 * rate limits
 * distributed locks
-* Redis pub/sub channels for SSE fan-out (`silkie:device:{id}:events`)
+* Redis pub/sub channels for SSE fan-out (`selkie:device:{id}:events`)
 
 The durable store should be relational. Ephemeral coordination state should
 live in a fast in-memory store. Final candidate sets and selected path do not
@@ -663,7 +663,7 @@ Fan-out is implemented via **Redis pub/sub**:
 - When a session event is generated, the server publishes to the Redis channel
   for that device:
   ```
-  PUBLISH silkie:device:{device_id}:events <json_event>
+  PUBLISH selkie:device:{device_id}:events <json_event>
   ```
 - Every server instance that has a client SSE connection for `device_id`
   subscribes to that channel and forwards messages to its connected clients.
@@ -679,7 +679,7 @@ SSE clients must handle disconnection and reconnect with `Last-Event-ID`.
 The server assigns a monotonic integer ID to each event (`id:` SSE field).
 On reconnect with `Last-Event-ID: N`, the server replays any events since
 `N` that are still in Redis (60-second buffer keyed by
-`silkie:device:{id}:event_buffer`).
+`selkie:device:{id}:event_buffer`).
 
 ---
 

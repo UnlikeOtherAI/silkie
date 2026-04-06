@@ -1,6 +1,6 @@
 # Database Schema
 
-This is the authoritative PostgreSQL schema for the Silkie MVP control plane.
+This is the authoritative PostgreSQL schema for the Selkie MVP control plane.
 It covers every durable table currently required by the docs: `User`,
 `Device`, `DeviceKey`, `Service`, `ConnectSession`, `RelayCredential`,
 `RelayAllocation`, `AuditEvent`, `PairCode`, and `DeviceCode`.

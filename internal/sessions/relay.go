@@ -12,7 +12,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
-	"github.com/unlikeotherai/silkie/internal/auth"
+	"github.com/unlikeotherai/selkie/internal/auth"
 	"go.uber.org/zap"
 )
 
@@ -68,7 +68,9 @@ func (h *Handler) handleRelayCredentials(w http.ResponseWriter, r *http.Request)
 	// Generate ephemeral TURN credentials using coturn's use-auth-secret mechanism.
 	now := time.Now().UTC()
 	expiresAt := now.Add(relayCredentialTTL * time.Second)
-	username := fmt.Sprintf("%d:%s", expiresAt.Unix(), claims.Sub)
+	// Embed session ID in the TURN username so coturn's redis-statsdb events
+	// can be correlated back to our connect_sessions rows.
+	username := fmt.Sprintf("%d:%s", expiresAt.Unix(), sessionID)
 
 	mac := hmac.New(sha1.New, []byte(h.cfg.CoturnSecret))
 	mac.Write([]byte(username))

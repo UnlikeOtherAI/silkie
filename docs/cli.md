@@ -1,6 +1,6 @@
-# Silkie CLI
+# Selkie CLI
 
-The Silkie CLI is a Node.js daemon published on npm. It runs as an OS service
+The Selkie CLI is a Node.js daemon published on npm. It runs as an OS service
 on each enrolled device, maintains the local WireGuard interface, reports the
 device's service manifest to the control server, and listens for real-time
 session events over SSE.
@@ -8,7 +8,7 @@ session events over SSE.
 ## Install
 
 ```sh
-npm install -g silkie
+npm install -g selkie
 ```
 
 Requires Node.js 20+. The package ships native WireGuard support for macOS
@@ -19,11 +19,11 @@ and Linux.
 After enrollment, install the system service so the daemon starts on boot:
 
 ```sh
-silkie service install
-silkie service start
-silkie service status
-silkie service stop
-silkie service uninstall
+selkie service install
+selkie service start
+selkie service status
+selkie service stop
+selkie service uninstall
 ```
 
 ### Privilege model
@@ -31,19 +31,19 @@ silkie service uninstall
 WireGuard interface management is privileged. The daemon does not get broad
 root access beyond that requirement.
 
-- macOS: there is no Linux capability model, so Silkie uses a privileged
+- macOS: there is no Linux capability model, so Selkie uses a privileged
   root-owned helper. The preferred install is a launchd `LaunchDaemon`
   running as root; a tightly scoped setuid helper is the fallback. That
-  helper may only create, configure, and destroy the Silkie WireGuard
+  helper may only create, configure, and destroy the Selkie WireGuard
   interface and associated routes.
-- Linux: `silkie service install` writes a systemd unit that runs as root with
+- Linux: `selkie service install` writes a systemd unit that runs as root with
   an explicit capability boundary instead of unrestricted root behavior.
 
 Reference Linux unit shape:
 
 ```ini
 [Unit]
-Description=Silkie daemon
+Description=Selkie daemon
 After=network-online.target
 Wants=network-online.target
 
@@ -51,7 +51,7 @@ Wants=network-online.target
 Type=simple
 User=root
 Group=root
-ExecStart=/usr/local/bin/silkie daemon
+ExecStart=/usr/local/bin/selkie daemon
 Restart=always
 RestartSec=1
 CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW
@@ -70,14 +70,14 @@ WantedBy=multi-user.target
 The WireGuard interface lifecycle is owned by the daemon and helper:
 
 1. On service start, create the interface if it does not already exist.
-2. Apply the last-known Silkie config immediately so the overlay comes up
+2. Apply the last-known Selkie config immediately so the overlay comes up
    before the first successful heartbeat.
 3. Keep the interface up while the service is running, even if the server is
    temporarily unreachable.
-4. On `silkie service stop`, remove the interface cleanly.
-5. On `silkie service uninstall`, stop the service, destroy the interface,
+4. On `selkie service stop`, remove the interface cleanly.
+5. On `selkie service uninstall`, stop the service, destroy the interface,
    remove the helper or unit, and delete local state if the user also runs
-   `silkie logout`.
+   `selkie logout`.
 
 The interface is not left behind on stop or uninstall.
 
@@ -95,7 +95,7 @@ The crash-loop counter resets after 10 minutes of stable runtime.
 ## Enrollment
 
 Two authentication paths are available. Both result in the CLI holding a
-device credential on disk (`~/.silkie/credential`) and the server registering
+device credential on disk (`~/.selkie/credential`) and the server registering
 the device's WireGuard public key.
 
 The CLI generates the WireGuard keypair locally on first run. The private key
@@ -107,7 +107,7 @@ Use this when enrolling a headless server or any machine where opening a
 browser is inconvenient.
 
 ```sh
-silkie enroll
+selkie enroll
 ```
 
 The CLI:
@@ -130,7 +130,7 @@ Codes expire after 10 minutes and are single-use.
 Use this when you are sitting at the machine being enrolled.
 
 ```sh
-silkie enroll --sso
+selkie enroll --sso
 ```
 
 The CLI:
@@ -147,20 +147,20 @@ server is unreachable: `1s, 2s, 4s, 8s, 16s, 32s, 60s`, capped at 60 seconds.
 
 | Command | Description |
 |---|---|
-| `silkie enroll` | Enroll this device using a pairing code |
-| `silkie enroll --sso` | Enroll this device via SSO browser login |
-| `silkie status` | Show device status, overlay IP, and active connections |
-| `silkie service install` | Install the system service |
-| `silkie service start` | Start the service |
-| `silkie service stop` | Stop the service and destroy the WireGuard interface |
-| `silkie service status` | Show service health |
-| `silkie service uninstall` | Remove the system service and helper |
-| `silkie logout` | Revoke the credential and remove device registration |
-| `silkie logs` | Stream daemon logs |
+| `selkie enroll` | Enroll this device using a pairing code |
+| `selkie enroll --sso` | Enroll this device via SSO browser login |
+| `selkie status` | Show device status, overlay IP, and active connections |
+| `selkie service install` | Install the system service |
+| `selkie service start` | Start the service |
+| `selkie service stop` | Stop the service and destroy the WireGuard interface |
+| `selkie service status` | Show service health |
+| `selkie service uninstall` | Remove the system service and helper |
+| `selkie logout` | Revoke the credential and remove device registration |
+| `selkie logs` | Stream daemon logs |
 
 ## Configuration
 
-Config lives at `~/.silkie/config.json`. Most values are written during
+Config lives at `~/.selkie/config.json`. Most values are written during
 enrollment and should not be edited manually.
 
 | Key | Description |
@@ -171,7 +171,7 @@ enrollment and should not be edited manually.
 | `wg_public_key` | WireGuard public key |
 | `overlay_ip` | Assigned overlay IP |
 
-The WireGuard private key is stored separately at `~/.silkie/wg.key` with
+The WireGuard private key is stored separately at `~/.selkie/wg.key` with
 mode `0600`.
 
 ## Runtime behavior
@@ -221,7 +221,7 @@ This avoids unnecessary tunnel churn during brief outages.
 On macOS and Linux, the daemon writes its log file to:
 
 ```text
-~/.silkie/silkie.log
+~/.selkie/selkie.log
 ```
 
 Rotation policy:
@@ -230,7 +230,7 @@ Rotation policy:
 - keep 3 archived files
 - continue writing to the active file without truncating on restart
 
-`silkie logs` tails this file and also surfaces recent service-manager status
+`selkie logs` tails this file and also surfaces recent service-manager status
 when available.
 
 ## Device fingerprint
@@ -260,15 +260,15 @@ What is and is not collected:
 - CPU and memory figures are point-in-time snapshots.
 - `disk_free_bytes` and `network_interfaces` are refreshed on every heartbeat.
 - No process list, file contents, browser history, or user activity is sent.
-- `silkie enroll --dry-run` prints the exact enrollment payload before any
+- `selkie enroll --dry-run` prints the exact enrollment payload before any
   network call is made.
 
 ## Security notes
 
 - The WireGuard private key is generated locally and never transmitted.
-- The device credential is an opaque token stored at rest in `~/.silkie/`.
+- The device credential is an opaque token stored at rest in `~/.selkie/`.
   Treat it like a private key.
-- Running `silkie logout` revokes the credential server-side and removes all
+- Running `selkie logout` revokes the credential server-side and removes all
   local state.
 - The daemon communicates with the server over HTTPS only. Self-signed certs
   are not accepted unless `--insecure` is passed explicitly for development.

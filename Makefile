@@ -21,7 +21,7 @@ vet:
 ## fmt: format all Go sources with gofumpt + goimports
 fmt:
 	gofumpt -w .
-	goimports -w -local github.com/unlikeotherai/silkie .
+	goimports -w -local github.com/unlikeotherai/selkie .
 
 ## tidy: tidy go.mod and verify module graph
 tidy:

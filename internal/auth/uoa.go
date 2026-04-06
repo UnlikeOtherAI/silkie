@@ -16,7 +16,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 
-	"github.com/unlikeotherai/silkie/internal/config"
+	"github.com/unlikeotherai/selkie/internal/config"
 )
 
 // UOAClaims represents the identity claims returned from the UOA token exchange.

@@ -1,4 +1,4 @@
-module github.com/unlikeotherai/silkie
+module github.com/unlikeotherai/selkie
 
 go 1.25.0
 

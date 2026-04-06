@@ -89,7 +89,7 @@ func (e *Engine) Evaluate(ctx context.Context, input Input) (*Result, error) {
 		return nil, fmt.Errorf("marshal policy input: %w", err)
 	}
 
-	endpoint := e.opaURL + "/v1/data/silkie/access"
+	endpoint := e.opaURL + "/v1/data/selkie/access"
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {

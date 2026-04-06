@@ -3,7 +3,7 @@
 <head>
 	<meta charset="utf-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1" />
-	<title>Silkie — Admin</title>
+	<title>Selkie — Admin</title>
 	<link rel="icon" type="image/png" href="/assets/app-icon.png" />
 	<script src="https://cdn.tailwindcss.com?plugins=typography"></script>
 	<script>
@@ -57,7 +57,7 @@
 		<div class="max-w-7xl mx-auto flex items-center justify-between px-6 h-14">
 			<div class="flex items-center gap-3">
 				<img src="/assets/app-icon.png" alt="" class="h-7 w-7 rounded-lg" />
-				<span class="font-semibold tracking-tight text-sm">Silkie</span>
+				<span class="font-semibold tracking-tight text-sm">Selkie</span>
 			</div>
 			<nav class="flex items-center gap-1">
 				<button onclick="switchTab('devices')" id="tab-devices" class="tab-active text-sm font-medium px-4 py-4 border-b-2 transition">Devices</button>
@@ -255,7 +255,7 @@ function el(tag, className, textContent) {
 function td(className, textContent) { return el('td', className, textContent); }
 
 // -- Auth / JWT ---------------------------------------------------------------
-var TOKEN_KEY = 'silkie_jwt';
+var TOKEN_KEY = 'selkie_jwt';
 
 function getToken() {
 	return localStorage.getItem(TOKEN_KEY);

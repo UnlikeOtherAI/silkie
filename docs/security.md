@@ -1,18 +1,18 @@
 # Security
 
-This document records the concrete security controls for the Silkie MVP. It
+This document records the concrete security controls for the Selkie MVP. It
 focuses on endpoint abuse resistance, bearer credential handling, admin UI
 browser security, and audit coverage.
 
 ## Authentication surfaces
 
-Silkie has three distinct credential types:
+Selkie has three distinct credential types:
 
 | Credential | Holder | Format | Storage |
 |---|---|---|---|
 | UOA access token | browser / mobile app | HS256 JWT from UOA | browser memory or mobile secure storage |
-| internal session token | browser / mobile app | HS256 JWT from Silkie | `localStorage` in the SPA, Keychain/Keystore on mobile |
-| device credential | CLI daemon | random 32 bytes, base64url-encoded | `~/.silkie/credential` on disk, bcrypt hash in Postgres |
+| internal session token | browser / mobile app | HS256 JWT from Selkie | `localStorage` in the SPA, Keychain/Keystore on mobile |
+| device credential | CLI daemon | random 32 bytes, base64url-encoded | `~/.selkie/credential` on disk, bcrypt hash in Postgres |
 
 The browser never gets raw device credentials. The CLI never gets a user
 session token.
@@ -69,16 +69,16 @@ Required request headers:
 | Header | Value |
 |---|---|
 | `Authorization` | `Bearer <device credential>` |
-| `X-Silkie-Device-Key` | device WireGuard public key |
-| `X-Silkie-Timestamp` | UNIX timestamp |
-| `X-Silkie-Nonce` | single-use random nonce |
-| `X-Silkie-Binding` | `base64url(HMAC-SHA256(credential, wg_public_key || method || path || timestamp || nonce || body_sha256))` |
+| `X-Selkie-Device-Key` | device WireGuard public key |
+| `X-Selkie-Timestamp` | UNIX timestamp |
+| `X-Selkie-Nonce` | single-use random nonce |
+| `X-Selkie-Binding` | `base64url(HMAC-SHA256(credential, wg_public_key || method || path || timestamp || nonce || body_sha256))` |
 
 Verification rules:
 
-1. Look up the device by `X-Silkie-Device-Key`.
+1. Look up the device by `X-Selkie-Device-Key`.
 2. Verify the bearer credential against the stored bcrypt hash.
-3. Recompute `X-Silkie-Binding` server-side and compare with
+3. Recompute `X-Selkie-Binding` server-side and compare with
    `crypto/subtle.ConstantTimeCompare`.
 4. Reject timestamps outside a 30-second skew window.
 5. Reject nonce reuse using a short-lived Redis key.

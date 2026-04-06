@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/unlikeotherai/silkie/internal/config"
+	"github.com/unlikeotherai/selkie/internal/config"
 )
 
 // Claims holds the authenticated user identity extracted from a JWT.
