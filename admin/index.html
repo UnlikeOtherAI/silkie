@@ -65,7 +65,10 @@
 				<button onclick="switchTab('system')" id="tab-system" class="tab-inactive text-sm font-medium px-4 py-4 border-b-2 transition">System</button>
 			</nav>
 			<div class="flex items-center gap-4">
-				<span id="user-email" class="text-xs text-ink-400 font-mono"></span>
+				<div class="flex items-center gap-2.5">
+					<img id="user-avatar" src="" alt="" class="hidden h-7 w-7 rounded-full ring-1 ring-ink-700 bg-ink-800" />
+					<span id="user-email" class="text-xs text-ink-400 font-mono"></span>
+				</div>
 				<button onclick="logout()" class="text-xs text-ink-400 hover:text-ink-200 transition">Sign out</button>
 			</div>
 		</div>
@@ -791,8 +794,15 @@ document.addEventListener('DOMContentLoaded', function() {
 	var claims = parseJWT(getToken());
 	if (claims) {
 		var emailEl = document.getElementById('user-email');
-		var email = claims.email || claims.sub || '';
-		emailEl.textContent = claims.is_super ? email + ' (super)' : email;
+		var label = claims.display_name || claims.email || claims.sub || '';
+		emailEl.textContent = claims.is_super ? label + ' (super)' : label;
+
+		if (claims.picture) {
+			var avatarEl = document.getElementById('user-avatar');
+			avatarEl.src = claims.picture;
+			avatarEl.alt = label;
+			avatarEl.classList.remove('hidden');
+		}
 	}
 
 	loadDevices();
