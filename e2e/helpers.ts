@@ -16,6 +16,6 @@ export function getState(): {
 export async function devLogin(page: Page) {
   const state = getState();
   await page.goto(`${state.baseURL}/auth/dev-login`);
-  await page.waitForURL("**/admin#token=*", { timeout: 5000 });
+  await page.waitForURL("**/admin**", { timeout: 5000 });
   await page.waitForSelector("#user-email", { timeout: 5000 });
 }
