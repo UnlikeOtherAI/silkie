@@ -2,6 +2,7 @@ package sessions_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/unlikeotherai/selkie/internal/config"
+	"github.com/unlikeotherai/selkie/internal/ratelimit"
 	"github.com/unlikeotherai/selkie/internal/sessions"
 	"github.com/unlikeotherai/selkie/internal/store"
 )
@@ -41,14 +43,28 @@ func mintToken(t *testing.T, sub string, isSuper bool) string {
 	return signed
 }
 
+type fakeLimiter struct {
+	decision ratelimit.Decision
+	err      error
+}
+
+func (f fakeLimiter) Allow(_ context.Context, _ string, _ int64, _ time.Duration) (ratelimit.Decision, error) {
+	return f.decision, f.err
+}
+
 func setupRouter(t *testing.T) chi.Router {
+	t.Helper()
+	return setupRouterWithLimiter(t, nil)
+}
+
+func setupRouterWithLimiter(t *testing.T, limiter ratelimit.Limiter) chi.Router {
 	t.Helper()
 
 	cfg := config.Config{InternalSessionSecret: testSecret}
 	// DB with nil Pool — tests that return before DB access work fine;
 	// tests that would hit the DB are not included here.
 	db := &store.DB{}
-	h := sessions.New(db, nil, nil, cfg, nil)
+	h := sessions.New(db, nil, nil, cfg, nil, limiter)
 
 	r := chi.NewRouter()
 	h.Mount(r)
@@ -244,7 +260,7 @@ func TestRelay_NoCoturnSecret(t *testing.T) {
 	// CoturnSecret is empty → 503 "relay not configured".
 	cfg := config.Config{InternalSessionSecret: testSecret, CoturnSecret: ""}
 	db := &store.DB{}
-	h := sessions.New(db, nil, nil, cfg, nil)
+	h := sessions.New(db, nil, nil, cfg, nil, fakeLimiter{decision: ratelimit.Decision{Allowed: true}})
 
 	r := chi.NewRouter()
 	h.Mount(r)
@@ -275,4 +291,37 @@ func TestRoutes_MethodNotAllowed(t *testing.T) {
 	if rr.Code != http.StatusMethodNotAllowed && rr.Code != http.StatusNotFound {
 		t.Errorf("expected 405 or 404 for wrong method, got %d", rr.Code)
 	}
+}
+
+func TestCreateSession_RateLimited(t *testing.T) {
+	r := setupRouterWithLimiter(t, fakeLimiter{decision: ratelimit.Decision{Allowed: false, RetryAfter: 11 * time.Second}})
+
+	body := `{"requester_device_id":"d1","target_device_id":"d2","target_service_id":"svc","requested_action":"connect"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/sessions", bytes.NewBufferString(body))
+	req.Header.Set("Authorization", "Bearer "+mintToken(t, "user-rate", false))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	r.ServeHTTP(rr, req)
+	assertStatus(t, rr, http.StatusTooManyRequests)
+	if got := rr.Header().Get("Retry-After"); got != "11" {
+		t.Fatalf("Retry-After = %q, want 11", got)
+	}
+	assertErrorBody(t, rr, "rate limit exceeded")
+}
+
+func TestRelay_RateLimited(t *testing.T) {
+	r := setupRouterWithLimiter(t, fakeLimiter{decision: ratelimit.Decision{Allowed: false, RetryAfter: 13 * time.Second}})
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/sessions/some-id/relay", bytes.NewBufferString(`{}`))
+	req.Header.Set("Authorization", "Bearer "+mintToken(t, "user-rate", false))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	r.ServeHTTP(rr, req)
+	assertStatus(t, rr, http.StatusTooManyRequests)
+	if got := rr.Header().Get("Retry-After"); got != "13" {
+		t.Fatalf("Retry-After = %q, want 13", got)
+	}
+	assertErrorBody(t, rr, "rate limit exceeded")
 }

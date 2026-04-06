@@ -1,3 +1,4 @@
+//nolint:testpackage // White-box tests cover package-private helpers and handlers.
 package overlay
 
 import (

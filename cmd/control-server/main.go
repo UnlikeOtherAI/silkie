@@ -27,6 +27,7 @@ import (
 	"github.com/unlikeotherai/selkie/internal/nat"
 	"github.com/unlikeotherai/selkie/internal/overlay"
 	"github.com/unlikeotherai/selkie/internal/policy"
+	"github.com/unlikeotherai/selkie/internal/ratelimit"
 	"github.com/unlikeotherai/selkie/internal/services"
 	"github.com/unlikeotherai/selkie/internal/sessions"
 	"github.com/unlikeotherai/selkie/internal/store"
@@ -77,6 +78,8 @@ func runServe(ctx context.Context, cfg config.Config, logger *zap.Logger) error 
 	} else {
 		logger.Warn("redis disabled (REDIS_URL not set), SSE fan-out unavailable")
 	}
+
+	limiter := ratelimit.NewRedisLimiter(rdb.Client)
 
 	var overlayAlloc *overlay.Allocator
 	if cfg.WGOverlayCIDR != "" {
@@ -149,12 +152,12 @@ func runServe(ctx context.Context, cfg config.Config, logger *zap.Logger) error 
 
 	auditor := audit.New(db, logger)
 
-	auth.NewCallbackHandler(db, cfg, auditor, logger).Mount(r)
+	auth.NewCallbackHandler(db, cfg, auditor, logger, limiter).Mount(r)
 	admin.New(db, logger, cfg).Mount(r)
-	devices.New(db, logger, cfg, overlayAlloc, auditor, hub).Mount(r)
-	mobile.New(db, logger, cfg, overlayAlloc, auditor, hub).Mount(r)
+	devices.New(db, logger, cfg, overlayAlloc, auditor, hub, limiter).Mount(r)
+	mobile.New(db, logger, cfg, overlayAlloc, auditor, hub, limiter).Mount(r)
 	services.New(db, logger, cfg).Mount(r)
-	sessions.New(db, rdb, logger, cfg, policyEngine).Mount(r)
+	sessions.New(db, rdb, logger, cfg, policyEngine, limiter).Mount(r)
 
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.ServerPort),

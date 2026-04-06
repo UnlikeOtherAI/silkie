@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/unlikeotherai/selkie/internal/audit"
 	"github.com/unlikeotherai/selkie/internal/auth"
+	"github.com/unlikeotherai/selkie/internal/ratelimit"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -37,6 +38,11 @@ type pairCodeRecord struct {
 	RequestedAgentVersion string
 }
 
+type pairClaimTracker interface {
+	Peek(ctx context.Context, key string) (ratelimit.Decision, error)
+	Hit(ctx context.Context, key string, window time.Duration) (ratelimit.Decision, error)
+}
+
 //nolint:gocyclo,gocognit // linear multi-step claim process is clearer as one function
 func (h *Handler) pairClaim(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
@@ -57,6 +63,11 @@ func (h *Handler) pairClaim(w http.ResponseWriter, r *http.Request) {
 	code := strings.ToUpper(strings.TrimSpace(req.Code))
 	if code == "" {
 		writeError(w, http.StatusBadRequest, "code is required")
+		return
+	}
+
+	sourceIP := audit.RemoteAddr(r)
+	if !h.allowPairClaim(ctx, w, sourceIP, code) {
 		return
 	}
 
@@ -92,15 +103,15 @@ WHERE code_hash = sha256($1::bytea)
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			writeError(w, http.StatusNotFound, "invalid or expired code")
+			h.handleInvalidPairClaim(ctx, w, sourceIP, code)
 			return
 		}
 		writeError(w, http.StatusInternalServerError, "failed to load pair code")
 		return
 	}
 
-	if pc.FailCount >= 5 {
-		writeError(w, http.StatusLocked, "code locked")
+	if pc.FailCount >= pairClaimFailureLimit {
+		writeRateLimitError(w, pairClaimCodeLockWindow)
 		return
 	}
 
@@ -197,7 +208,7 @@ WHERE id = $3
 			Outcome:     "success",
 			TargetTable: "devices",
 			TargetID:    &deviceID,
-			RemoteIP:    audit.RemoteAddr(r),
+			RemoteIP:    sourceIP,
 			UserAgent:   r.UserAgent(),
 		}); auditErr != nil {
 			h.logger.Error("audit device.create", zap.Error(auditErr))
@@ -209,4 +220,80 @@ WHERE id = $3
 		OverlayIP:  overlayIP,
 		Credential: credential,
 	})
+}
+
+func (h *Handler) allowPairClaim(ctx context.Context, w http.ResponseWriter, sourceIP, code string) bool {
+	tracker, ok := h.pairClaimTracker()
+	if !ok {
+		writeError(w, http.StatusServiceUnavailable, "rate limiting unavailable")
+		return false
+	}
+
+	keys := []string{
+		ratelimit.Key("devices", "pair", "claim", "failure", "ip", sourceIP),
+		ratelimit.Key("devices", "pair", "claim", "failure", "code", ratelimit.HashToken(code)),
+	}
+	for _, key := range keys {
+		decision, err := tracker.Peek(ctx, key)
+		if err != nil {
+			h.logger.Error("pair claim lock check failed", zap.Error(err), zap.String("key", key))
+			writeError(w, http.StatusServiceUnavailable, "rate limiting unavailable")
+			return false
+		}
+		if decision.Count >= pairClaimFailureLimit {
+			writeRateLimitError(w, decision.RetryAfter)
+			return false
+		}
+	}
+	return true
+}
+
+func (h *Handler) handleInvalidPairClaim(ctx context.Context, w http.ResponseWriter, sourceIP, code string) {
+	allowed, retryAfter, err := h.recordPairClaimFailure(ctx, sourceIP, code)
+	if err != nil {
+		h.logger.Error("record pair claim failure", zap.Error(err), zap.String("source_ip", sourceIP))
+		writeError(w, http.StatusServiceUnavailable, "rate limiting unavailable")
+		return
+	}
+	if !allowed {
+		writeRateLimitError(w, retryAfter)
+		return
+	}
+	writeError(w, http.StatusNotFound, "invalid or expired code")
+}
+
+func (h *Handler) recordPairClaimFailure(ctx context.Context, sourceIP, code string) (bool, time.Duration, error) {
+	tracker, ok := h.pairClaimTracker()
+	if !ok {
+		return false, 0, errors.New("rate limiter unavailable")
+	}
+
+	checks := []struct {
+		key    string
+		window time.Duration
+	}{
+		{key: ratelimit.Key("devices", "pair", "claim", "failure", "ip", sourceIP), window: pairClaimSourceLockWindow},
+		{key: ratelimit.Key("devices", "pair", "claim", "failure", "code", ratelimit.HashToken(code)), window: pairClaimCodeLockWindow},
+	}
+
+	var retryAfter time.Duration
+	for _, check := range checks {
+		decision, err := tracker.Hit(ctx, check.key, check.window)
+		if err != nil {
+			return false, 0, err
+		}
+		if decision.RetryAfter > retryAfter {
+			retryAfter = decision.RetryAfter
+		}
+		if decision.Count >= pairClaimFailureLimit {
+			return false, decision.RetryAfter, nil
+		}
+	}
+
+	return true, retryAfter, nil
+}
+
+func (h *Handler) pairClaimTracker() (pairClaimTracker, bool) {
+	tracker, ok := h.limiter.(pairClaimTracker)
+	return tracker, ok
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
 	"github.com/unlikeotherai/selkie/internal/auth"
+	"github.com/unlikeotherai/selkie/internal/ratelimit"
 	"go.uber.org/zap"
 )
 
@@ -37,6 +38,10 @@ func (h *Handler) handleRelayCredentials(w http.ResponseWriter, r *http.Request)
 	sessionID := strings.TrimSpace(chi.URLParam(r, "id"))
 	if sessionID == "" {
 		writeError(w, http.StatusBadRequest, "session id is required")
+		return
+	}
+
+	if !h.allowRateLimit(r.Context(), w, ratelimit.Key("sessions", "relay", "session", sessionID), sessionRelayLimit, sessionRelayWindow) {
 		return
 	}
 

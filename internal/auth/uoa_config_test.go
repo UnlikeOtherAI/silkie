@@ -20,7 +20,7 @@ func TestServeUOAConfig(t *testing.T) {
 		UOARedirectURL:  "https://admin.selkie.live/auth/callback",
 		UOAAudience:     "auth.unlikeotherai.com",
 		UOASharedSecret: "shared-secret",
-	}, nil, nil)
+	}, nil, nil, nil)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/auth/uoa-config", nil)
@@ -62,7 +62,7 @@ func TestServeUOAConfig(t *testing.T) {
 }
 
 func TestServeUOAConfigIncomplete(t *testing.T) {
-	h := auth.NewCallbackHandler(nil, config.Config{}, nil, nil)
+	h := auth.NewCallbackHandler(nil, config.Config{}, nil, nil, nil)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/auth/uoa-config", nil)
@@ -93,7 +93,7 @@ func TestServeUOAConfigPayloadShape(t *testing.T) {
 		UOARedirectURL:  "https://admin.selkie.live/auth/callback",
 		UOAAudience:     "auth.unlikeotherai.com",
 		UOASharedSecret: "shared-secret",
-	}, nil, nil)
+	}, nil, nil, nil)
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/auth/uoa-config", nil)

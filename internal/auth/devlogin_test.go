@@ -14,7 +14,7 @@ import (
 func TestDevStatus_Enabled(t *testing.T) {
 	r := chi.NewRouter()
 	cfg := config.Config{DevMode: true, InternalSessionSecret: "test-secret"}
-	h := auth.NewCallbackHandler(nil, cfg, nil, nil)
+	h := auth.NewCallbackHandler(nil, cfg, nil, nil, nil)
 	h.Mount(r)
 
 	req := httptest.NewRequest(http.MethodGet, "/auth/dev-status", nil)
@@ -37,7 +37,7 @@ func TestDevStatus_Enabled(t *testing.T) {
 func TestDevStatus_Disabled(t *testing.T) {
 	r := chi.NewRouter()
 	cfg := config.Config{DevMode: false, InternalSessionSecret: "test-secret"}
-	h := auth.NewCallbackHandler(nil, cfg, nil, nil)
+	h := auth.NewCallbackHandler(nil, cfg, nil, nil, nil)
 	h.Mount(r)
 
 	req := httptest.NewRequest(http.MethodGet, "/auth/dev-status", nil)
@@ -60,7 +60,7 @@ func TestDevStatus_Disabled(t *testing.T) {
 func TestDevLogin_Disabled(t *testing.T) {
 	r := chi.NewRouter()
 	cfg := config.Config{DevMode: false, InternalSessionSecret: "test-secret"}
-	h := auth.NewCallbackHandler(nil, cfg, nil, nil)
+	h := auth.NewCallbackHandler(nil, cfg, nil, nil, nil)
 	h.Mount(r)
 
 	req := httptest.NewRequest(http.MethodGet, "/auth/dev-login", nil)

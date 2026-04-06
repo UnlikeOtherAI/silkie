@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,26 +17,35 @@ import (
 	"github.com/unlikeotherai/selkie/internal/auth"
 	"github.com/unlikeotherai/selkie/internal/config"
 	"github.com/unlikeotherai/selkie/internal/policy"
+	"github.com/unlikeotherai/selkie/internal/ratelimit"
 	"github.com/unlikeotherai/selkie/internal/store"
 	"go.uber.org/zap"
 )
 
+const (
+	sessionCreateLimit  = 30
+	sessionCreateWindow = time.Minute
+	sessionRelayLimit   = 10
+	sessionRelayWindow  = time.Minute
+)
+
 // Handler serves session-related HTTP endpoints.
 type Handler struct {
-	rdb    *store.Redis
-	db     *store.DB
-	logger *zap.Logger
-	cfg    config.Config
-	policy *policy.Engine
+	rdb     *store.Redis
+	db      *store.DB
+	logger  *zap.Logger
+	cfg     config.Config
+	policy  *policy.Engine
+	limiter ratelimit.Limiter
 }
 
 // New creates a sessions Handler with the given dependencies.
-func New(db *store.DB, rdb *store.Redis, logger *zap.Logger, cfg config.Config, pe *policy.Engine) *Handler {
+func New(db *store.DB, rdb *store.Redis, logger *zap.Logger, cfg config.Config, pe *policy.Engine, limiter ratelimit.Limiter) *Handler {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
 
-	return &Handler{db: db, rdb: rdb, logger: logger, cfg: cfg, policy: pe}
+	return &Handler{db: db, rdb: rdb, logger: logger, cfg: cfg, policy: pe, limiter: limiter}
 }
 
 // Mount registers session routes on the given router behind auth middleware.
@@ -77,6 +87,10 @@ func (h *Handler) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 
 	if req.RequesterDeviceID == "" || req.TargetDeviceID == "" || req.TargetServiceID == "" || req.RequestedAction == "" {
 		writeError(w, http.StatusBadRequest, "missing required fields")
+		return
+	}
+
+	if !h.allowRateLimit(r.Context(), w, ratelimit.Key("sessions", "create", "user", claims.Sub), sessionCreateLimit, sessionCreateWindow) {
 		return
 	}
 
@@ -369,6 +383,36 @@ func writeRawJSON(w http.ResponseWriter, status int, payload []byte) {
 
 func writeError(w http.ResponseWriter, status int, message string) {
 	writeJSON(w, status, map[string]string{"error": message})
+}
+
+func (h *Handler) allowRateLimit(ctx context.Context, w http.ResponseWriter, key string, limit int64, window time.Duration) bool {
+	if h.limiter == nil {
+		writeError(w, http.StatusServiceUnavailable, "rate limiting unavailable")
+		return false
+	}
+	decision, err := h.limiter.Allow(ctx, key, limit, window)
+	if err != nil {
+		h.logger.Error("rate limit check failed", zap.Error(err), zap.String("key", key))
+		writeError(w, http.StatusServiceUnavailable, "rate limiting unavailable")
+		return false
+	}
+	if decision.Allowed {
+		return true
+	}
+	writeRateLimitError(w, decision.RetryAfter)
+	return false
+}
+
+func writeRateLimitError(w http.ResponseWriter, retryAfter time.Duration) {
+	seconds := int(retryAfter.Seconds())
+	if retryAfter%time.Second != 0 {
+		seconds++
+	}
+	if seconds < 1 {
+		seconds = 1
+	}
+	w.Header().Set("Retry-After", strconv.Itoa(seconds))
+	writeError(w, http.StatusTooManyRequests, "rate limit exceeded")
 }
 
 func nilIfEmpty(s string) *string {

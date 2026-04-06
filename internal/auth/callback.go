@@ -9,6 +9,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,22 +20,30 @@ import (
 
 	"github.com/unlikeotherai/selkie/internal/audit"
 	"github.com/unlikeotherai/selkie/internal/config"
+	"github.com/unlikeotherai/selkie/internal/ratelimit"
 	"github.com/unlikeotherai/selkie/internal/store"
 )
 
-const mobileHandoffTTL = 60 * time.Second
+const (
+	mobileHandoffTTL            = 60 * time.Second
+	mobileHandoffExchangeLimit  = 10
+	mobileHandoffExchangeWindow = time.Minute
+	mobileHandoffFailureLimit   = 10
+	mobileHandoffFailureWindow  = time.Minute
+)
 
 // CallbackHandler handles the OAuth callback from UOA, upserting the user and issuing a session JWT.
 type CallbackHandler struct {
-	db     *store.DB
-	cfg    config.Config
-	audit  *audit.Logger
-	logger *zap.Logger
+	db      *store.DB
+	cfg     config.Config
+	audit   *audit.Logger
+	logger  *zap.Logger
+	limiter ratelimit.Limiter
 }
 
 // NewCallbackHandler creates a CallbackHandler with the given database, config, and audit logger.
-func NewCallbackHandler(db *store.DB, cfg config.Config, auditor *audit.Logger, logger *zap.Logger) *CallbackHandler {
-	return &CallbackHandler{db: db, cfg: cfg, audit: auditor, logger: logger}
+func NewCallbackHandler(db *store.DB, cfg config.Config, auditor *audit.Logger, logger *zap.Logger, limiter ratelimit.Limiter) *CallbackHandler {
+	return &CallbackHandler{db: db, cfg: cfg, audit: auditor, logger: logger, limiter: limiter}
 }
 
 // Mount registers the auth routes on the given router.
@@ -57,7 +66,7 @@ func (*CallbackHandler) ServeLogin(w http.ResponseWriter, r *http.Request) {
 func (h *CallbackHandler) ServeCallback(w http.ResponseWriter, r *http.Request) {
 	userID, isSuper, uoaClaims, err := h.exchangeAndUpsertUser(r.Context(), r.URL.Query().Get("code"))
 	if err != nil {
-		h.writeExchangeError(w, err)
+		writeExchangeError(w, err)
 		return
 	}
 
@@ -81,7 +90,7 @@ func (h *CallbackHandler) ServeCallback(w http.ResponseWriter, r *http.Request) 
 func (h *CallbackHandler) ServeMobileCallback(w http.ResponseWriter, r *http.Request) {
 	userID, _, _, err := h.exchangeAndUpsertUser(r.Context(), r.URL.Query().Get("code"))
 	if err != nil {
-		h.writeExchangeError(w, err)
+		writeExchangeError(w, err)
 		return
 	}
 
@@ -110,11 +119,6 @@ func (h *CallbackHandler) ServeMobileCallback(w http.ResponseWriter, r *http.Req
 
 // ServeMobileHandoffExchange consumes a one-time handoff code and returns a Selkie session token.
 func (h *CallbackHandler) ServeMobileHandoffExchange(w http.ResponseWriter, r *http.Request) {
-	if h.db == nil || h.db.Pool == nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-
 	var req struct {
 		HandoffCode string `json:"handoff_code"`
 	}
@@ -130,7 +134,16 @@ func (h *CallbackHandler) ServeMobileHandoffExchange(w http.ResponseWriter, r *h
 	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	if !h.allowRateLimit(ctx, w, ratelimit.Key("mobile", "handoff", "exchange", audit.RemoteAddr(r), ratelimit.HashToken(handoffCode)), mobileHandoffExchangeLimit, mobileHandoffExchangeWindow) {
+		cancel()
+		return
+	}
 	defer cancel()
+
+	if h.db == nil || h.db.Pool == nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 
 	tx, err := h.db.Pool.Begin(ctx)
 	if err != nil {
@@ -152,18 +165,19 @@ WHERE mh.code_hash = sha256($1::bytea)
 RETURNING u.id, u.email, u.display_name, u.is_super
 `, handoffCode).Scan(&userID, &email, &displayName, &isSuper)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			writeJSONError(w, http.StatusUnauthorized, "invalid mobile handoff code")
-			return
+		switch {
+		case errors.Is(err, pgx.ErrNoRows):
+			h.handleInvalidMobileHandoff(ctx, w, r, handoffCode)
+		default:
+			if h.logger != nil {
+				h.logger.Error("consume mobile handoff code", zap.Error(err))
+			}
+			writeJSONError(w, http.StatusInternalServerError, "failed to exchange mobile handoff code")
 		}
-		if h.logger != nil {
-			h.logger.Error("consume mobile handoff code", zap.Error(err))
-		}
-		writeJSONError(w, http.StatusInternalServerError, "failed to exchange mobile handoff code")
 		return
 	}
 
-	if err := tx.Commit(ctx); err != nil {
+	if commitErr := tx.Commit(ctx); commitErr != nil {
 		writeJSONError(w, http.StatusInternalServerError, "failed to finalize mobile handoff exchange")
 		return
 	}
@@ -178,6 +192,60 @@ RETURNING u.id, u.email, u.display_name, u.is_super
 		"token":      token,
 		"expires_in": int((24 * time.Hour).Seconds()),
 	})
+}
+
+func (h *CallbackHandler) checkRateLimit(ctx context.Context, key string, limit int64, window time.Duration) (ratelimit.Decision, error) {
+	if h.limiter == nil {
+		return ratelimit.Decision{}, errors.New("rate limiter unavailable")
+	}
+	decision, err := h.limiter.Allow(ctx, key, limit, window)
+	if err != nil && h.logger != nil {
+		h.logger.Error("rate limit check failed", zap.Error(err), zap.String("key", key))
+	}
+	return decision, err
+}
+
+func (h *CallbackHandler) allowRateLimit(ctx context.Context, w http.ResponseWriter, key string, limit int64, window time.Duration) bool {
+	decision, err := h.checkRateLimit(ctx, key, limit, window)
+	if err != nil {
+		writeJSONError(w, http.StatusServiceUnavailable, "rate limiting unavailable")
+		return false
+	}
+	if decision.Allowed {
+		return true
+	}
+	writeRateLimitError(w, decision.RetryAfter)
+	return false
+}
+
+func (h *CallbackHandler) recordMobileHandoffFailure(ctx context.Context, sourceIP, handoffCode string) (bool, error) {
+	keys := []string{
+		ratelimit.Key("mobile", "handoff", "failure", "ip", sourceIP),
+		ratelimit.Key("mobile", "handoff", "failure", "code", ratelimit.HashToken(handoffCode)),
+	}
+	for _, key := range keys {
+		decision, err := h.checkRateLimit(ctx, key, mobileHandoffFailureLimit, mobileHandoffFailureWindow)
+		if err != nil {
+			return false, err
+		}
+		if !decision.Allowed {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func (h *CallbackHandler) handleInvalidMobileHandoff(ctx context.Context, w http.ResponseWriter, r *http.Request, handoffCode string) {
+	allowed, rateErr := h.recordMobileHandoffFailure(ctx, audit.RemoteAddr(r), handoffCode)
+	if rateErr != nil {
+		writeJSONError(w, http.StatusServiceUnavailable, "rate limiting unavailable")
+		return
+	}
+	if !allowed {
+		writeRateLimitError(w, mobileHandoffFailureWindow)
+		return
+	}
+	writeJSONError(w, http.StatusUnauthorized, "invalid mobile handoff code")
 }
 
 func (h *CallbackHandler) exchangeAndUpsertUser(ctx context.Context, code string) (string, bool, *UOAClaims, error) {
@@ -238,7 +306,7 @@ func (h *CallbackHandler) auditLogin(ctx context.Context, r *http.Request, userI
 	}
 }
 
-func (h *CallbackHandler) writeExchangeError(w http.ResponseWriter, err error) {
+func writeExchangeError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, errMissingCode):
 		http.Error(w, "missing code", http.StatusBadRequest)
@@ -349,6 +417,18 @@ func writeJSON(w http.ResponseWriter, status int, value any) {
 
 func writeJSONError(w http.ResponseWriter, status int, message string) {
 	writeJSON(w, status, map[string]string{"error": message})
+}
+
+func writeRateLimitError(w http.ResponseWriter, retryAfter time.Duration) {
+	seconds := int(retryAfter.Seconds())
+	if retryAfter%time.Second != 0 {
+		seconds++
+	}
+	if seconds < 1 {
+		seconds = 1
+	}
+	w.Header().Set("Retry-After", strconv.Itoa(seconds))
+	writeJSONError(w, http.StatusTooManyRequests, "rate limit exceeded")
 }
 
 func randomMobileHandoffCode(length int) (string, error) {

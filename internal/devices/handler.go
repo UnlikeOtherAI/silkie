@@ -9,6 +9,7 @@ import (
 	"io"
 	"math/big"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/unlikeotherai/selkie/internal/auth"
 	"github.com/unlikeotherai/selkie/internal/config"
 	"github.com/unlikeotherai/selkie/internal/overlay"
+	"github.com/unlikeotherai/selkie/internal/ratelimit"
 	"github.com/unlikeotherai/selkie/internal/store"
 	"go.uber.org/zap"
 )
@@ -29,6 +31,16 @@ type HubSyncer interface {
 }
 
 // Handler serves device-related HTTP endpoints.
+const (
+	pairStartLimit            = 10
+	pairStartWindow           = time.Minute
+	deviceHeartbeatLimit      = 3
+	deviceHeartbeatWindow     = time.Minute
+	pairClaimFailureLimit     = 5
+	pairClaimCodeLockWindow   = 15 * time.Minute
+	pairClaimSourceLockWindow = time.Hour
+)
+
 type Handler struct {
 	db      *store.DB
 	logger  *zap.Logger
@@ -36,15 +48,16 @@ type Handler struct {
 	overlay *overlay.Allocator
 	audit   *audit.Logger
 	hub     HubSyncer
+	limiter ratelimit.Limiter
 }
 
 // New creates a devices Handler with the given dependencies.
-func New(db *store.DB, logger *zap.Logger, cfg config.Config, alloc *overlay.Allocator, auditor *audit.Logger, hub HubSyncer) *Handler {
+func New(db *store.DB, logger *zap.Logger, cfg config.Config, alloc *overlay.Allocator, auditor *audit.Logger, hub HubSyncer, limiter ratelimit.Limiter) *Handler {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
 
-	return &Handler{db: db, logger: logger, cfg: cfg, overlay: alloc, audit: auditor, hub: hub}
+	return &Handler{db: db, logger: logger, cfg: cfg, overlay: alloc, audit: auditor, hub: hub, limiter: limiter}
 }
 
 // Mount registers device routes on the given router behind auth middleware.
@@ -72,10 +85,10 @@ type pairStartRequest struct {
 }
 
 type heartbeatRequest struct {
-	ExternalEndpointHost string `json:"external_endpoint_host"`
-	ExternalEndpointPort int    `json:"external_endpoint_port"`
-	AgentVersion         string `json:"agent_version"`
-	DiskFreeBytes        int64  `json:"disk_free_bytes"`
+	ExternalEndpointHost *string `json:"external_endpoint_host"`
+	ExternalEndpointPort *int    `json:"external_endpoint_port"`
+	AgentVersion         *string `json:"agent_version"`
+	DiskFreeBytes        *int64  `json:"disk_free_bytes"`
 }
 
 func (h *Handler) handlePairStart(w http.ResponseWriter, r *http.Request) {
@@ -93,6 +106,10 @@ func (h *Handler) handlePairStart(w http.ResponseWriter, r *http.Request) {
 
 	if req.WGPublicKey == "" || req.Hostname == "" || req.OSPlatform == "" || req.OSArch == "" || req.AgentVersion == "" {
 		writeError(w, http.StatusBadRequest, "missing required fields")
+		return
+	}
+
+	if !h.allowRateLimit(r.Context(), w, ratelimit.Key("devices", "pair", "start", "ip", audit.RemoteAddr(r)), pairStartLimit, pairStartWindow) {
 		return
 	}
 
@@ -251,20 +268,24 @@ func (h *Handler) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !h.allowRateLimit(r.Context(), w, ratelimit.Key("devices", "heartbeat", "device", deviceID), deviceHeartbeatLimit, deviceHeartbeatWindow) {
+		return
+	}
+
 	commandTag, err := h.db.Pool.Exec(
 		r.Context(),
 		`update devices
-		set external_endpoint_host = $1,
-			external_endpoint_port = $2,
-			agent_version = $3,
-			disk_free_bytes = $4,
+		set external_endpoint_host = COALESCE($1, external_endpoint_host),
+			external_endpoint_port = COALESCE($2, external_endpoint_port),
+			agent_version = COALESCE($3, agent_version),
+			disk_free_bytes = COALESCE($4, disk_free_bytes),
 			last_seen_at = now(),
 			updated_at = now()
 		where id = $5 and owner_user_id = $6`,
-		req.ExternalEndpointHost,
-		req.ExternalEndpointPort,
-		req.AgentVersion,
-		req.DiskFreeBytes,
+		optionalString(req.ExternalEndpointHost),
+		optionalInt(req.ExternalEndpointPort),
+		optionalString(req.AgentVersion),
+		optionalInt64(req.DiskFreeBytes),
 		deviceID,
 		claims.Sub,
 	)
@@ -346,6 +367,24 @@ func (h *Handler) handleDeleteDevice(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (h *Handler) allowRateLimit(ctx context.Context, w http.ResponseWriter, key string, limit int64, window time.Duration) bool {
+	if h.limiter == nil {
+		writeError(w, http.StatusServiceUnavailable, "rate limiting unavailable")
+		return false
+	}
+	decision, err := h.limiter.Allow(ctx, key, limit, window)
+	if err != nil {
+		h.logger.Error("rate limit check failed", zap.Error(err), zap.String("key", key))
+		writeError(w, http.StatusServiceUnavailable, "rate limiting unavailable")
+		return false
+	}
+	if decision.Allowed {
+		return true
+	}
+	writeRateLimitError(w, decision.RetryAfter)
+	return false
+}
+
 func decodeJSON(r *http.Request, dst any) error {
 	defer r.Body.Close()
 
@@ -363,6 +402,27 @@ func decodeJSON(r *http.Request, dst any) error {
 	return nil
 }
 
+func optionalString(value *string) any {
+	if value == nil {
+		return nil
+	}
+	return *value
+}
+
+func optionalInt(value *int) any {
+	if value == nil {
+		return nil
+	}
+	return *value
+}
+
+func optionalInt64(value *int64) any {
+	if value == nil {
+		return nil
+	}
+	return *value
+}
+
 func writeJSON(w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -377,6 +437,18 @@ func writeRawJSON(w http.ResponseWriter, status int, payload []byte) {
 
 func writeError(w http.ResponseWriter, status int, message string) {
 	writeJSON(w, status, map[string]string{"error": message})
+}
+
+func writeRateLimitError(w http.ResponseWriter, retryAfter time.Duration) {
+	seconds := int(retryAfter.Seconds())
+	if retryAfter%time.Second != 0 {
+		seconds++
+	}
+	if seconds < 1 {
+		seconds = 1
+	}
+	w.Header().Set("Retry-After", strconv.Itoa(seconds))
+	writeError(w, http.StatusTooManyRequests, "rate limit exceeded")
 }
 
 func randomCode(length int) (string, error) {
