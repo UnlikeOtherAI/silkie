@@ -87,7 +87,6 @@ func runServe(ctx context.Context, cfg config.Config, logger *zap.Logger) error 
 
 	// Policy engine (allow-all when OPA_ENDPOINT is empty).
 	policyEngine := policy.New(cfg.OPAEndpoint, logger)
-	_ = policyEngine // wired into session creation when policy checks are enabled
 
 	// Coturn redis-statsdb subscriber for relay allocation tracking.
 	if cfg.CoturnRedisStatsDB != "" {
@@ -96,7 +95,7 @@ func runServe(ctx context.Context, cfg config.Config, logger *zap.Logger) error 
 			return fmt.Errorf("parse coturn redis statsdb url: %w", err)
 		}
 		statsClient := redis.NewClient(statsOpts)
-		defer statsClient.Close() //nolint:errcheck
+		defer statsClient.Close() //nolint:errcheck // best-effort close on shutdown
 		statsSub := nat.NewStatsSubscriber(statsClient, db, logger)
 		go statsSub.Run(ctx)
 		logger.Info("coturn statsdb subscriber started")
@@ -141,7 +140,7 @@ func runServe(ctx context.Context, cfg config.Config, logger *zap.Logger) error 
 	admin.New(db, logger, cfg).Mount(r)
 	devices.New(db, logger, cfg, overlayAlloc, auditor).Mount(r)
 	services.New(db, logger, cfg).Mount(r)
-	sessions.New(db, rdb, logger, cfg).Mount(r)
+	sessions.New(db, rdb, logger, cfg, policyEngine).Mount(r)
 
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.ServerPort),

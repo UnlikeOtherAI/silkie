@@ -45,6 +45,7 @@ func (h *Handler) Mount(r chi.Router) {
 	r.Group(func(r chi.Router) {
 		r.Use(auth.Middleware(h.cfg))
 		r.Get("/api/v1/audit", h.handleListAuditEvents)
+		r.Get("/api/v1/system/info", h.handleSystemInfo)
 	})
 }
 
@@ -131,6 +132,41 @@ func (h *Handler) handleListAuditEvents(w http.ResponseWriter, r *http.Request) 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(payload)
+}
+
+func (h *Handler) handleSystemInfo(w http.ResponseWriter, r *http.Request) {
+	claims, ok := auth.ClaimsFromContext(r.Context())
+	if !ok || claims.Sub == "" {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	info := map[string]any{
+		"version":          "0.1.0",
+		"overlay_cidr":     h.cfg.WGOverlayCIDR,
+		"turn_configured":  h.cfg.TurnHost != "",
+		"turn_host":        h.cfg.TurnHost,
+		"turn_port":        h.cfg.TurnPort,
+		"opa_configured":   h.cfg.OPAEndpoint != "",
+		"redis_configured": h.cfg.RedisURL != "",
+	}
+
+	// Device and session counts (only for super users).
+	if claims.IsSuper {
+		var deviceCount, sessionCount int
+		if scanErr := h.db.Pool.QueryRow(r.Context(),
+			`SELECT count(*) FROM devices WHERE status = 'active'`).Scan(&deviceCount); scanErr != nil {
+			h.logger.Error("count active devices", zap.Error(scanErr))
+		}
+		if scanErr := h.db.Pool.QueryRow(r.Context(),
+			`SELECT count(*) FROM connect_sessions WHERE status NOT IN ('closed', 'expired', 'denied')`).Scan(&sessionCount); scanErr != nil {
+			h.logger.Error("count active sessions", zap.Error(scanErr))
+		}
+		info["active_devices"] = deviceCount
+		info["active_sessions"] = sessionCount
+	}
+
+	writeJSON(w, http.StatusOK, info)
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {

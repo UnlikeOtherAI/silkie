@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/unlikeotherai/selkie/internal/auth"
 	"github.com/unlikeotherai/selkie/internal/config"
+	"github.com/unlikeotherai/selkie/internal/policy"
 	"github.com/unlikeotherai/selkie/internal/store"
 	"go.uber.org/zap"
 )
@@ -25,15 +26,16 @@ type Handler struct {
 	db     *store.DB
 	logger *zap.Logger
 	cfg    config.Config
+	policy *policy.Engine
 }
 
 // New creates a sessions Handler with the given dependencies.
-func New(db *store.DB, rdb *store.Redis, logger *zap.Logger, cfg config.Config) *Handler {
+func New(db *store.DB, rdb *store.Redis, logger *zap.Logger, cfg config.Config, pe *policy.Engine) *Handler {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
 
-	return &Handler{db: db, rdb: rdb, logger: logger, cfg: cfg}
+	return &Handler{db: db, rdb: rdb, logger: logger, cfg: cfg, policy: pe}
 }
 
 // Mount registers session routes on the given router behind auth middleware.
@@ -78,6 +80,31 @@ func (h *Handler) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Evaluate access policy before creating the session.
+	var sessionStatus, denialReason string
+	if h.policy != nil {
+		decision, policyErr := h.policy.Evaluate(r.Context(), policy.Input{
+			UserID:      claims.Sub,
+			DeviceID:    req.TargetDeviceID,
+			ServiceID:   req.TargetServiceID,
+			Action:      req.RequestedAction,
+			RequestTime: time.Now().UTC(),
+		})
+		if policyErr != nil {
+			h.logger.Error("policy evaluation failed", zap.Error(policyErr), zap.String("requester_user_id", claims.Sub))
+			writeError(w, http.StatusInternalServerError, "policy evaluation failed")
+			return
+		}
+		if !decision.Allow {
+			sessionStatus = "denied"
+			denialReason = decision.Reason
+		} else {
+			sessionStatus = "pending"
+		}
+	} else {
+		sessionStatus = "pending"
+	}
+
 	var payload []byte
 	err := h.db.Pool.QueryRow(
 		r.Context(),
@@ -89,8 +116,9 @@ func (h *Handler) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 				target_service_id,
 				requested_action,
 				status,
+				denial_reason,
 				expires_at
-			) values ($1, $2, $3, $4, $5, 'pending', $6)
+			) values ($1, $2, $3, $4, $5, $6, $7, $8)
 			returning *
 		)
 		select row_to_json(inserted) from inserted`,
@@ -99,11 +127,18 @@ func (h *Handler) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 		req.TargetDeviceID,
 		req.TargetServiceID,
 		req.RequestedAction,
+		sessionStatus,
+		nilIfEmpty(denialReason),
 		time.Now().UTC().Add(time.Hour),
 	).Scan(&payload)
 	if err != nil {
 		h.logger.Error("create session", zap.Error(err), zap.String("requester_user_id", claims.Sub))
 		writeError(w, http.StatusInternalServerError, "failed to create session")
+		return
+	}
+
+	if sessionStatus == "denied" {
+		writeRawJSON(w, http.StatusForbidden, payload)
 		return
 	}
 
@@ -241,7 +276,7 @@ func (h *Handler) handleDeviceEvents(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Accel-Buffering", "no")
 	w.WriteHeader(http.StatusOK)
 
-	_, _ = fmt.Fprintf(w, "event: connected\ndata: {\"device_id\":%q}\n\n", deviceID) //nolint:errcheck // best-effort SSE write
+	_, _ = fmt.Fprintf(w, "event: connected\ndata: {\"device_id\":%q}\n\n", deviceID) //nolint:errcheck,gosec // best-effort SSE write; deviceID is server-validated UUID, not user-controlled HTML
 	flusher.Flush()
 
 	if h.rdb == nil {
@@ -331,4 +366,11 @@ func writeRawJSON(w http.ResponseWriter, status int, payload []byte) {
 
 func writeError(w http.ResponseWriter, status int, message string) {
 	writeJSON(w, status, map[string]string{"error": message})
+}
+
+func nilIfEmpty(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }

@@ -291,6 +291,7 @@ func (h *Handler) handleDeleteDevice(w http.ResponseWriter, r *http.Request) {
 		r.Context(),
 		`update devices
 		set status = 'revoked',
+			revoked_at = now(),
 			overlay_ip_reclaim_after = now() + interval '24 hours',
 			updated_at = now()
 		where id = $1 and owner_user_id = $2`,

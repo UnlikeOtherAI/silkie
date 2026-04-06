@@ -3,6 +3,7 @@ package nat
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -31,26 +32,26 @@ func NewCoturnCLI(addr, password string, logger *zap.Logger) *CoturnCLI {
 // then runs "cs <session-id>" for each to terminate them.
 func (c *CoturnCLI) KillSession(ctx context.Context, turnUsername string) error {
 	if c.addr == "" {
-		return fmt.Errorf("coturn CLI address not configured")
+		return errors.New("coturn CLI address not configured")
 	}
 
 	conn, err := c.dial(ctx)
 	if err != nil {
 		return fmt.Errorf("connect to coturn CLI: %w", err)
 	}
-	defer conn.Close()
+	defer conn.Close() //nolint:errcheck // best-effort close on CLI teardown
 
 	reader := bufio.NewReader(conn)
 
 	// Authenticate if password is set.
 	if c.password != "" {
-		if err := c.sendCommand(conn, reader, c.password); err != nil {
-			return fmt.Errorf("authenticate with coturn CLI: %w", err)
+		if authErr := sendCommand(conn, reader, c.password); authErr != nil {
+			return fmt.Errorf("authenticate with coturn CLI: %w", authErr)
 		}
 	}
 
 	// List sessions for this username.
-	output, err := c.sendCommandRead(conn, reader, fmt.Sprintf("ps %s", turnUsername))
+	output, err := sendCommandRead(conn, reader, "ps "+turnUsername)
 	if err != nil {
 		return fmt.Errorf("list sessions for %q: %w", turnUsername, err)
 	}
@@ -66,11 +67,11 @@ func (c *CoturnCLI) KillSession(ctx context.Context, turnUsername string) error 
 
 	// Cancel each session.
 	for _, sid := range sessionIDs {
-		c.logger.Info("cancelling coturn session",
+		c.logger.Info("canceling coturn session",
 			zap.String("session_id", sid),
 			zap.String("username", turnUsername))
-		if err := c.sendCommand(conn, reader, fmt.Sprintf("cs %s", sid)); err != nil {
-			c.logger.Error("cancel coturn session", zap.Error(err),
+		if cancelErr := sendCommand(conn, reader, "cs "+sid); cancelErr != nil {
+			c.logger.Error("cancel coturn session", zap.Error(cancelErr),
 				zap.String("session_id", sid))
 		}
 	}
@@ -84,17 +85,21 @@ func (c *CoturnCLI) dial(ctx context.Context) (net.Conn, error) {
 	return d.DialContext(ctx, "tcp", c.addr)
 }
 
-func (c *CoturnCLI) sendCommand(conn net.Conn, reader *bufio.Reader, cmd string) error {
-	conn.SetWriteDeadline(time.Now().Add(coturnCLITimeout))
-	if _, err := fmt.Fprintf(conn, "%s\n", cmd); err != nil {
+func sendCommand(conn net.Conn, reader *bufio.Reader, cmd string) error {
+	if err := conn.SetWriteDeadline(time.Now().Add(coturnCLITimeout)); err != nil {
+		return err
+	}
+	if _, err := conn.Write([]byte(cmd + "\n")); err != nil {
 		return err
 	}
 	// Read and discard response lines until we hit a prompt or timeout.
-	conn.SetReadDeadline(time.Now().Add(coturnCLITimeout))
+	if err := conn.SetReadDeadline(time.Now().Add(coturnCLITimeout)); err != nil {
+		return err
+	}
 	for {
-		line, err := reader.ReadString('\n')
-		if err != nil {
-			return nil // timeout or EOF is expected after command completes
+		line, readErr := reader.ReadString('\n')
+		if readErr != nil {
+			return nil //nolint:nilerr // timeout or EOF is expected after command completes
 		}
 		if strings.Contains(line, "> ") {
 			return nil
@@ -102,18 +107,23 @@ func (c *CoturnCLI) sendCommand(conn net.Conn, reader *bufio.Reader, cmd string)
 	}
 }
 
-func (c *CoturnCLI) sendCommandRead(conn net.Conn, reader *bufio.Reader, cmd string) (string, error) {
-	conn.SetWriteDeadline(time.Now().Add(coturnCLITimeout))
-	if _, err := fmt.Fprintf(conn, "%s\n", cmd); err != nil {
+func sendCommandRead(conn net.Conn, reader *bufio.Reader, cmd string) (string, error) {
+	if err := conn.SetWriteDeadline(time.Now().Add(coturnCLITimeout)); err != nil {
+		return "", err
+	}
+	if _, err := conn.Write([]byte(cmd + "\n")); err != nil {
 		return "", err
 	}
 
 	var sb strings.Builder
-	conn.SetReadDeadline(time.Now().Add(coturnCLITimeout))
+	if err := conn.SetReadDeadline(time.Now().Add(coturnCLITimeout)); err != nil {
+		return "", err
+	}
 	for {
-		line, err := reader.ReadString('\n')
-		if err != nil {
-			break
+		line, readErr := reader.ReadString('\n')
+		if readErr != nil {
+			// Timeout or EOF — return what we have so far.
+			return sb.String(), nil //nolint:nilerr // timeout/EOF is the expected termination signal from coturn CLI
 		}
 		sb.WriteString(line)
 		if strings.Contains(line, "> ") {
@@ -124,7 +134,7 @@ func (c *CoturnCLI) sendCommandRead(conn net.Conn, reader *bufio.Reader, cmd str
 }
 
 // parseSessionIDs extracts numeric session identifiers from coturn CLI output.
-// The `ps` command outputs lines like "  1) id=001000000000000001, ..."
+// The ps command outputs lines like "  1) id=001000000000000001, ...".
 func parseSessionIDs(output string) []string {
 	var ids []string
 	for _, line := range strings.Split(output, "\n") {

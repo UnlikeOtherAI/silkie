@@ -35,14 +35,14 @@ func NewStatsSubscriber(rdb *redis.Client, db *store.DB, logger *zap.Logger) *St
 	return &StatsSubscriber{rdb: rdb, db: db, logger: logger}
 }
 
-// Run subscribes to coturn statsdb channels and processes events until ctx is cancelled.
+// Run subscribes to coturn statsdb channels and processes events until ctx is canceled.
 // It blocks and should be called in a goroutine.
 func (s *StatsSubscriber) Run(ctx context.Context) {
 	sub := s.rdb.PSubscribe(ctx,
 		"turn/realm/*/user/*/allocation/*/status",
 		"turn/realm/*/user/*/allocation/*/total_traffic",
 	)
-	defer sub.Close() //nolint:errcheck
+	defer sub.Close() //nolint:errcheck // best-effort close on subscriber teardown
 
 	s.logger.Info("coturn statsdb subscriber started")
 
@@ -73,7 +73,7 @@ var trafficRe = regexp.MustCompile(`(\w+)=(\d+)`)
 func (s *StatsSubscriber) handleMessage(ctx context.Context, channel, payload string) {
 	m := channelRe.FindStringSubmatch(channel)
 	if m == nil {
-		s.logger.Debug("ignoring unrecognised statsdb channel", zap.String("channel", channel))
+		s.logger.Debug("ignoring unrecognized statsdb channel", zap.String("channel", channel))
 		return
 	}
 	realm, username, allocID, eventType := m[1], m[2], m[3], m[4]
@@ -82,7 +82,7 @@ func (s *StatsSubscriber) handleMessage(ctx context.Context, channel, payload st
 	// formats usernames as "expiry_timestamp:session_uuid".
 	sessionID := extractSessionID(username)
 	if sessionID == "" {
-		s.logger.Debug("ignoring allocation for unrecognised username format",
+		s.logger.Debug("ignoring allocation for unrecognized username format",
 			zap.String("username", username), zap.String("allocation_id", allocID))
 		return
 	}
@@ -136,8 +136,8 @@ func (s *StatsSubscriber) handleStatus(ctx context.Context, realm, sessionID, al
 
 func (s *StatsSubscriber) handleTotalTraffic(ctx context.Context, sessionID, allocID, payload string) {
 	counters := parseTraffic(payload)
-	bytesUp := counters["rcvb"]   // client → TURN
-	bytesDown := counters["sentb"] // TURN → client
+	bytesUp := counters["rcvb"]    // client to TURN
+	bytesDown := counters["sentb"] // TURN to client
 
 	s.logger.Info("relay allocation total traffic",
 		zap.String("session_id", sessionID),

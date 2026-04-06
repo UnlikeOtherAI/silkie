@@ -131,18 +131,8 @@
 			<div id="panel-system" class="hidden space-y-6">
 				<h2 class="text-lg font-bold tracking-tight">System</h2>
 
-				<!-- JWT Claims -->
-				<div class="bg-ink-900 border border-ink-800 rounded-2xl overflow-hidden">
-					<div class="px-5 py-3.5 border-b border-ink-800">
-						<span class="text-sm font-semibold">JWT Claims</span>
-					</div>
-					<div class="p-5">
-						<pre id="jwt-claims" class="font-mono text-xs text-ink-300 bg-ink-950 rounded-xl p-4 overflow-auto max-h-64"></pre>
-					</div>
-				</div>
-
-				<!-- Health -->
-				<div class="grid md:grid-cols-2 gap-4">
+				<!-- Server Info -->
+				<div class="grid md:grid-cols-3 gap-4">
 					<div class="bg-ink-900 border border-ink-800 rounded-2xl overflow-hidden">
 						<div class="px-5 py-3.5 border-b border-ink-800">
 							<span class="text-sm font-semibold">Health Check</span>
@@ -165,22 +155,77 @@
 
 					<div class="bg-ink-900 border border-ink-800 rounded-2xl overflow-hidden">
 						<div class="px-5 py-3.5 border-b border-ink-800">
-							<span class="text-sm font-semibold">Overlay Network</span>
+							<span class="text-sm font-semibold">Server</span>
 						</div>
 						<div class="divide-y divide-ink-800/60">
 							<div class="px-5 py-3 flex items-center justify-between text-sm">
-								<span class="text-ink-300">CIDR</span>
+								<span class="text-ink-300">Version</span>
+								<span id="sys-version" class="font-mono text-xs text-ink-300">--</span>
+							</div>
+							<div class="px-5 py-3 flex items-center justify-between text-sm">
+								<span class="text-ink-300">Active Devices</span>
+								<span id="sys-devices" class="font-mono text-xs text-ink-300">--</span>
+							</div>
+							<div class="px-5 py-3 flex items-center justify-between text-sm">
+								<span class="text-ink-300">Active Sessions</span>
+								<span id="sys-sessions" class="font-mono text-xs text-ink-300">--</span>
+							</div>
+						</div>
+					</div>
+
+					<div class="bg-ink-900 border border-ink-800 rounded-2xl overflow-hidden">
+						<div class="px-5 py-3.5 border-b border-ink-800">
+							<span class="text-sm font-semibold">Infrastructure</span>
+						</div>
+						<div class="divide-y divide-ink-800/60">
+							<div class="px-5 py-3 flex items-center justify-between text-sm">
+								<span class="text-ink-300">Overlay CIDR</span>
 								<span id="overlay-cidr" class="font-mono text-xs text-ink-300">--</span>
 							</div>
 							<div class="px-5 py-3 flex items-center justify-between text-sm">
-								<span class="text-ink-300">Token Issuer</span>
-								<span id="token-issuer" class="font-mono text-xs text-ink-300">--</span>
+								<span class="text-ink-300">TURN Relay</span>
+								<span id="sys-turn" class="flex items-center gap-1.5 text-xs text-ink-400">--</span>
 							</div>
 							<div class="px-5 py-3 flex items-center justify-between text-sm">
-								<span class="text-ink-300">Token Expires</span>
-								<span id="token-exp" class="font-mono text-xs text-ink-300">--</span>
+								<span class="text-ink-300">Policy (OPA)</span>
+								<span id="sys-opa" class="flex items-center gap-1.5 text-xs text-ink-400">--</span>
 							</div>
 						</div>
+					</div>
+				</div>
+
+				<!-- JWT Claims -->
+				<div class="bg-ink-900 border border-ink-800 rounded-2xl overflow-hidden">
+					<div class="px-5 py-3.5 border-b border-ink-800">
+						<span class="text-sm font-semibold">JWT Claims</span>
+					</div>
+					<div class="p-5">
+						<pre id="jwt-claims" class="font-mono text-xs text-ink-300 bg-ink-950 rounded-xl p-4 overflow-auto max-h-64"></pre>
+					</div>
+				</div>
+
+				<!-- Audit Log -->
+				<div class="bg-ink-900 border border-ink-800 rounded-2xl overflow-hidden">
+					<div class="px-5 py-3.5 border-b border-ink-800 flex items-center justify-between">
+						<span class="text-sm font-semibold">Audit Log</span>
+						<span id="audit-count" class="text-xs text-ink-400"></span>
+					</div>
+					<div id="audit-loading" class="px-5 py-4 text-sm text-ink-400">Loading audit events...</div>
+					<div id="audit-error" class="hidden px-5 py-4 text-sm text-red-400"></div>
+					<div id="audit-table-wrap" class="hidden">
+						<table class="w-full text-sm">
+							<thead>
+								<tr class="border-b border-ink-800 text-xs text-ink-400 uppercase tracking-wider">
+									<th class="text-left px-5 py-3 font-medium">Time</th>
+									<th class="text-left px-4 py-3 font-medium">Action</th>
+									<th class="text-left px-4 py-3 font-medium">Outcome</th>
+									<th class="text-left px-4 py-3 font-medium">Actor</th>
+									<th class="text-left px-4 py-3 font-medium">Target</th>
+									<th class="text-left px-4 py-3 font-medium">IP</th>
+								</tr>
+							</thead>
+							<tbody id="audit-body" class="divide-y divide-ink-800/60"></tbody>
+						</table>
 					</div>
 				</div>
 			</div>
@@ -397,7 +442,7 @@ function loadDevices() {
 	error.classList.add('hidden');
 	wrap.classList.add('hidden');
 
-	apiFetch('/v1/devices').then(function(resp) {
+	apiFetch('/api/v1/devices').then(function(resp) {
 		if (!resp.ok) throw new Error('Failed to load devices: ' + resp.status);
 		return resp.json();
 	}).then(function(data) {
@@ -466,7 +511,7 @@ function loadDevices() {
 
 function revokeDevice(id) {
 	if (!confirm('Revoke this device? It will need to re-enroll.')) return;
-	apiFetch('/v1/devices/' + id, { method: 'DELETE' }).then(function(resp) {
+	apiFetch('/api/v1/devices/' + id, { method: 'DELETE' }).then(function(resp) {
 		if (!resp.ok) throw new Error('Failed to revoke device: ' + resp.status);
 		loadDevices();
 	}).catch(function(e) {
@@ -514,7 +559,7 @@ function submitAddDevice() {
 	btn.disabled = true;
 	btn.textContent = 'Starting...';
 
-	apiFetch('/v1/auth/pair/start', { method: 'POST', body: payload }).then(function(resp) {
+	apiFetch('/api/v1/auth/pair/start', { method: 'POST', body: payload }).then(function(resp) {
 		if (!resp.ok) {
 			return resp.text().then(function(text) {
 				throw new Error(text || 'pair/start failed: ' + resp.status);
@@ -531,14 +576,13 @@ function submitAddDevice() {
 		document.getElementById('pair-poll-status').textContent = 'Waiting for device to claim...';
 		document.getElementById('pair-poll-status').className = 'text-sm text-ink-400';
 
-		// Poll pair/status every 2s
-		var deviceId = data.device_id || data.id || '';
-		if (deviceId) {
+		// Poll pair/status every 2s using the pair code
+		if (code) {
 			pairPollInterval = setInterval(function() {
-				apiFetch('/v1/auth/pair/status?device_id=' + encodeURIComponent(deviceId)).then(function(statusResp) {
+				apiFetch('/api/v1/auth/pair/status?code=' + encodeURIComponent(code)).then(function(statusResp) {
 					if (statusResp.ok) {
 						return statusResp.json().then(function(statusData) {
-							if (statusData.status === 'claimed' || statusData.status === 'active') {
+							if (statusData.status === 'claimed') {
 								clearInterval(pairPollInterval);
 								pairPollInterval = null;
 								document.getElementById('pair-poll-status').textContent = 'Device paired successfully!';
@@ -570,7 +614,7 @@ function loadSessions() {
 	error.classList.add('hidden');
 	wrap.classList.add('hidden');
 
-	apiFetch('/v1/sessions').then(function(resp) {
+	apiFetch('/api/v1/sessions').then(function(resp) {
 		if (!resp.ok) throw new Error('Failed to load sessions: ' + resp.status);
 		return resp.json();
 	}).then(function(data) {
@@ -613,6 +657,14 @@ function loadSessions() {
 }
 
 // -- System -------------------------------------------------------------------
+function setStatusIndicator(containerId, isActive, label) {
+	var container = document.getElementById(containerId);
+	container.replaceChildren();
+	var dot = el('span', 'status-dot ' + (isActive ? 'bg-accent-500' : 'bg-amber-400'));
+	container.appendChild(dot);
+	container.appendChild(document.createTextNode(label));
+}
+
 function loadSystem() {
 	var token = getToken();
 	var claims = token ? parseJWT(token) : null;
@@ -622,17 +674,97 @@ function loadSystem() {
 		? JSON.stringify(claims, null, 2)
 		: 'No token';
 
-	// Fill overlay/token info from claims
-	if (claims) {
-		document.getElementById('token-issuer').textContent = claims.iss || '--';
-		document.getElementById('token-exp').textContent = claims.exp
-			? new Date(claims.exp * 1000).toLocaleString()
-			: '--';
-	}
-
 	// Health checks
 	checkEndpoint('/healthz', 'health-healthz');
 	checkEndpoint('/readyz', 'health-readyz');
+
+	// Server info
+	apiFetch('/api/v1/system/info').then(function(resp) {
+		if (!resp.ok) return;
+		return resp.json();
+	}).then(function(info) {
+		if (!info) return;
+		document.getElementById('sys-version').textContent = info.version || '--';
+		document.getElementById('overlay-cidr').textContent = info.overlay_cidr || 'not configured';
+		document.getElementById('sys-devices').textContent = info.active_devices !== undefined ? info.active_devices : '--';
+		document.getElementById('sys-sessions').textContent = info.active_sessions !== undefined ? info.active_sessions : '--';
+
+		if (info.turn_configured) {
+			setStatusIndicator('sys-turn', true, info.turn_host + ':' + info.turn_port);
+		} else {
+			setStatusIndicator('sys-turn', false, 'not configured');
+		}
+
+		if (info.opa_configured) {
+			setStatusIndicator('sys-opa', true, 'enabled');
+		} else {
+			setStatusIndicator('sys-opa', false, 'allow-all (no OPA)');
+		}
+	}).catch(function() { /* ignore */ });
+
+	// Audit log (super users only)
+	loadAuditLog();
+}
+
+function loadAuditLog() {
+	var loading = document.getElementById('audit-loading');
+	var error = document.getElementById('audit-error');
+	var wrap = document.getElementById('audit-table-wrap');
+	var body = document.getElementById('audit-body');
+
+	loading.classList.remove('hidden');
+	error.classList.add('hidden');
+	wrap.classList.add('hidden');
+
+	apiFetch('/api/v1/audit?limit=50').then(function(resp) {
+		if (resp.status === 403) {
+			loading.classList.add('hidden');
+			error.textContent = 'Super-user access required to view audit log.';
+			error.classList.remove('hidden');
+			return null;
+		}
+		if (!resp.ok) throw new Error('Failed to load audit events: ' + resp.status);
+		return resp.json();
+	}).then(function(data) {
+		if (!data) return;
+		var events = Array.isArray(data) ? data : [];
+
+		document.getElementById('audit-count').textContent = events.length + ' events';
+		body.replaceChildren();
+
+		if (events.length === 0) {
+			var emptyRow = el('tr');
+			var emptyTd = td('px-5 py-10 text-center text-sm text-ink-500', 'No audit events');
+			emptyTd.colSpan = 6;
+			emptyRow.appendChild(emptyTd);
+			body.appendChild(emptyRow);
+		} else {
+			events.forEach(function(e) {
+				var row = el('tr', 'hover:bg-ink-800/40 transition');
+				row.appendChild(td('px-5 py-3 text-xs text-ink-400 whitespace-nowrap', fmtTime(e.occurred_at)));
+				row.appendChild(td('px-4 py-3 text-xs font-medium text-ink-200', e.action || '--'));
+
+				var outcomeTd = td('px-4 py-3');
+				var outcomeColor = e.outcome === 'success' || e.outcome === 'allow' ? 'text-accent-400' :
+					e.outcome === 'failure' || e.outcome === 'deny' ? 'text-red-400' : 'text-ink-400';
+				outcomeTd.appendChild(el('span', 'text-xs font-medium ' + outcomeColor, e.outcome || '--'));
+				row.appendChild(outcomeTd);
+
+				row.appendChild(td('px-4 py-3 font-mono text-xs text-ink-300', shortId(e.actor_user_id)));
+				row.appendChild(td('px-4 py-3 text-xs text-ink-300', (e.target_table || '') + (e.target_id ? '/' + shortId(e.target_id) : '')));
+				row.appendChild(td('px-4 py-3 font-mono text-xs text-ink-400', e.remote_ip || '--'));
+
+				body.appendChild(row);
+			});
+		}
+
+		loading.classList.add('hidden');
+		wrap.classList.remove('hidden');
+	}).catch(function(e) {
+		loading.classList.add('hidden');
+		error.textContent = e.message;
+		error.classList.remove('hidden');
+	});
 }
 
 function checkEndpoint(path, elementId) {
