@@ -38,8 +38,9 @@
       <!-- UOA sign-in button -->
       <!--
         Server-side: redirect to
-          https://authentication.unlikeotherai.com/oauth/authorize
+          https://authentication.unlikeotherai.com/auth
             ?config_url=<UOA_CONFIG_URL>
+            &redirect_url=<YOUR_CALLBACK_URL>
         UOA_CONFIG_URL and UOA_SHARED_SECRET must be set in .env (see .env.example).
         The config_url endpoint is signed with UOA_SHARED_SECRET (HS256).
       -->

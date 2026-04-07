@@ -14,6 +14,7 @@ type Config struct {
 	UOAAudience              string
 	UOAConfigURL             string
 	UOARedirectURL           string
+	UOAMobileRedirectURL     string
 	UOAOwnerSub              string
 	MobileRedirectURL        string
 	DatabaseURL              string
@@ -48,6 +49,7 @@ func Load() Config {
 		UOAAudience:              os.Getenv("UOA_AUDIENCE"),
 		UOAConfigURL:             os.Getenv("UOA_CONFIG_URL"),
 		UOARedirectURL:           os.Getenv("UOA_REDIRECT_URL"),
+		UOAMobileRedirectURL:     os.Getenv("UOA_MOBILE_REDIRECT_URL"),
 		UOAOwnerSub:              os.Getenv("UOA_OWNER_SUB"),
 		MobileRedirectURL:        getenv("MOBILE_REDIRECT_URL", "selkie://auth"),
 		DatabaseURL:              os.Getenv("DATABASE_URL"),

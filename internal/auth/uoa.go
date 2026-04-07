@@ -31,22 +31,63 @@ type tokenExchangeResponse struct {
 	AccessToken string `json:"access_token"`
 }
 
-// BuildAuthURL constructs the UOA OAuth authorize URL from the current config.
+// BuildAuthURL constructs the UOA auth URL from the current config.
 func BuildAuthURL() string {
 	cfg := config.Load()
-	baseURL := strings.TrimRight(cfg.UOABaseURL, "/")
+	return buildUOAAuthURL(cfg.UOABaseURL, cfg.UOAConfigURL, cfg.UOARedirectURL)
+}
+
+func buildUOAAuthURL(baseURL, configURL, redirectURL string) string {
+	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
 	query := url.Values{}
-	query.Set("config_url", cfg.UOAConfigURL)
-	if cfg.UOARedirectURL != "" {
-		query.Set("redirect_uri", cfg.UOARedirectURL)
+	if configURL = strings.TrimSpace(configURL); configURL != "" {
+		query.Set("config_url", configURL)
+	}
+	if redirectURL = strings.TrimSpace(redirectURL); redirectURL != "" {
+		query.Set("redirect_url", redirectURL)
+	}
+	if encoded := query.Encode(); encoded != "" {
+		return baseURL + "/auth?" + encoded
+	}
+	return baseURL + "/auth"
+}
+
+func uoaConfigDomain(cfg config.Config) (string, error) {
+	configURL := strings.TrimSpace(cfg.UOAConfigURL)
+	if configURL != "" {
+		parsed, err := url.Parse(configURL)
+		if err != nil {
+			return "", fmt.Errorf("parse UOA_CONFIG_URL: %w", err)
+		}
+		host := strings.TrimSpace(parsed.Hostname())
+		if host == "" {
+			return "", errors.New("UOA_CONFIG_URL must include a hostname")
+		}
+		return host, nil
 	}
 
-	return baseURL + "/oauth/authorize?" + query.Encode()
+	domain := strings.TrimSpace(cfg.UOADomain)
+	if domain == "" {
+		return "", errors.New("UOA_CONFIG_URL or UOA_DOMAIN is required")
+	}
+	return domain, nil
+}
+
+func uoaTokenEndpoint(cfg config.Config) (string, error) {
+	baseURL := strings.TrimRight(strings.TrimSpace(cfg.UOABaseURL), "/")
+	if baseURL == "" {
+		return "", errors.New("UOA_BASE_URL is required")
+	}
+	configURL := strings.TrimSpace(cfg.UOAConfigURL)
+	if configURL == "" {
+		return "", errors.New("UOA_CONFIG_URL is required")
+	}
+	query := url.Values{}
+	query.Set("config_url", configURL)
+	return baseURL + "/auth/token?" + query.Encode(), nil
 }
 
 // ExchangeCode exchanges an authorization code for UOA identity claims.
-//
-//nolint:gocognit // sequential auth exchange steps with multiple endpoints
 func ExchangeCode(ctx context.Context, code string) (*UOAClaims, error) {
 	cfg := config.Load()
 	if strings.TrimSpace(code) == "" {
@@ -58,71 +99,60 @@ func ExchangeCode(ctx context.Context, code string) (*UOAClaims, error) {
 		return nil, fmt.Errorf("marshal code exchange payload: %w", err)
 	}
 
-	authorization := uoaAuthorizationToken(cfg.UOADomain, cfg.UOASharedSecret)
+	domain, err := uoaConfigDomain(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("resolve UOA domain: %w", err)
+	}
+	endpoint, err := uoaTokenEndpoint(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("build UOA token endpoint: %w", err)
+	}
+
+	authorization := uoaAuthorizationToken(domain, cfg.UOASharedSecret)
 	client := &http.Client{Timeout: 10 * time.Second}
-	endpoints := []string{
-		strings.TrimRight(cfg.UOABaseURL, "/") + "/token",
-		strings.TrimRight(cfg.UOABaseURL, "/") + "/auth/token",
+
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
+	if err != nil {
+		return nil, fmt.Errorf("build token exchange request: %w", err)
+	}
+	request.Header.Set("Authorization", "Bearer "+authorization)
+	request.Header.Set("Content-Type", "application/json")
+
+	response, err := client.Do(request)
+	if err != nil {
+		return nil, fmt.Errorf("exchange code at %s: %w", endpoint, err)
+	}
+	defer response.Body.Close()
+
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read token exchange response from %s: %w", endpoint, err)
+	}
+	if response.StatusCode >= http.StatusMultipleChoices {
+		message := strings.TrimSpace(string(body))
+		if message == "" {
+			message = http.StatusText(response.StatusCode)
+		}
+		return nil, fmt.Errorf("token exchange failed at %s: status %d: %s", endpoint, response.StatusCode, message)
 	}
 
-	var lastErr error
-
-	for _, endpoint := range endpoints {
-		request, reqErr := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
-		if reqErr != nil {
-			return nil, fmt.Errorf("build token exchange request: %w", reqErr)
-		}
-		request.Header.Set("Authorization", "Bearer "+authorization)
-		request.Header.Set("Content-Type", "application/json")
-
-		response, doErr := client.Do(request)
-		if doErr != nil {
-			lastErr = fmt.Errorf("exchange code at %s: %w", endpoint, doErr)
-			continue
-		}
-
-		body, readErr := io.ReadAll(response.Body)
-		response.Body.Close()
-		if readErr != nil {
-			lastErr = fmt.Errorf("read token exchange response from %s: %w", endpoint, readErr)
-			continue
-		}
-
-		if response.StatusCode >= http.StatusMultipleChoices {
-			lastErr = fmt.Errorf("token exchange failed at %s: status %d", endpoint, response.StatusCode)
-			if response.StatusCode == http.StatusNotFound {
-				continue
-			}
-			continue
-		}
-
-		var tokenResponse tokenExchangeResponse
-		if unmarshalErr := json.Unmarshal(body, &tokenResponse); unmarshalErr != nil {
-			lastErr = fmt.Errorf("decode token exchange response from %s: %w", endpoint, unmarshalErr)
-			continue
-		}
-		if tokenResponse.AccessToken == "" {
-			lastErr = fmt.Errorf("token exchange at %s returned no access token", endpoint)
-			continue
-		}
-
-		claims, verifyErr := verifyUOAToken(tokenResponse.AccessToken, cfg.UOASharedSecret, cfg.UOAAudience)
-		if verifyErr != nil {
-			lastErr = fmt.Errorf("verify access token from %s: %w", endpoint, verifyErr)
-			continue
-		}
-		if claims.DisplayName == "" {
-			claims.DisplayName = claims.Name
-		}
-
-		return claims, nil
+	var tokenResponse tokenExchangeResponse
+	if unmarshalErr := json.Unmarshal(body, &tokenResponse); unmarshalErr != nil {
+		return nil, fmt.Errorf("decode token exchange response from %s: %w", endpoint, unmarshalErr)
+	}
+	if tokenResponse.AccessToken == "" {
+		return nil, fmt.Errorf("token exchange at %s returned no access token", endpoint)
 	}
 
-	if lastErr == nil {
-		lastErr = errors.New("token exchange failed")
+	claims, err := verifyUOAToken(tokenResponse.AccessToken, cfg.UOASharedSecret, cfg.UOAAudience)
+	if err != nil {
+		return nil, fmt.Errorf("verify access token from %s: %w", endpoint, err)
+	}
+	if claims.DisplayName == "" {
+		claims.DisplayName = claims.Name
 	}
 
-	return nil, lastErr
+	return claims, nil
 }
 
 func verifyUOAToken(tokenString string, secret string, audience string) (*UOAClaims, error) {

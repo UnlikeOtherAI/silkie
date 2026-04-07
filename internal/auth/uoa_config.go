@@ -2,42 +2,127 @@ package auth
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 )
 
-type uoaConfigClaims struct {
-	Domain             string         `json:"domain"`
-	RedirectURLs       []string       `json:"redirect_urls"`
-	EnabledAuthMethods []string       `json:"enabled_auth_methods"`
-	UserScope          string         `json:"user_scope"`
-	UITheme            map[string]any `json:"ui_theme"`
-	LanguageConfig     string         `json:"language_config"`
-	jwt.RegisteredClaims
+func uoaConfigRedirectURLs(cfg CallbackHandler) []string {
+	seen := make(map[string]struct{}, 2)
+	redirectURLs := make([]string, 0, 2)
+	for _, candidate := range []string{
+		strings.TrimSpace(cfg.cfg.UOARedirectURL),
+		strings.TrimSpace(cfg.cfg.UOAMobileRedirectURL),
+	} {
+		if candidate == "" {
+			continue
+		}
+		if _, ok := seen[candidate]; ok {
+			continue
+		}
+		seen[candidate] = struct{}{}
+		redirectURLs = append(redirectURLs, candidate)
+	}
+	return redirectURLs
+}
+
+func uoaDefaultTheme() map[string]any {
+	return map[string]any{
+		"colors": map[string]string{
+			"bg":           "#0f172a",
+			"surface":      "#111827",
+			"text":         "#e2e8f0",
+			"muted":        "#94a3b8",
+			"primary":      "#0f766e",
+			"primary_text": "#f0fdfa",
+			"border":       "#334155",
+			"danger":       "#dc2626",
+			"danger_text":  "#fef2f2",
+		},
+		"radii": map[string]string{
+			"card":   "20px",
+			"button": "12px",
+			"input":  "12px",
+		},
+		"density": "comfortable",
+		"button": map[string]string{
+			"style": "solid",
+		},
+		"card": map[string]string{
+			"style": "bordered",
+		},
+		"typography": map[string]any{
+			"font_family":    "sans",
+			"base_text_size": "md",
+		},
+		"logo": map[string]any{
+			"url":  "",
+			"alt":  "Selkie logo",
+			"text": "Selkie",
+		},
+	}
+}
+
+func uoaAllowedSocialProviders(methods []string) []string {
+	providers := make([]string, 0, 2)
+	for _, method := range methods {
+		switch method {
+		case "google", "apple", "facebook", "github", "linkedin":
+			providers = append(providers, method)
+		}
+	}
+	return providers
 }
 
 // ServeUOAConfig returns the signed client configuration JWT consumed by UOA.
 func (h *CallbackHandler) ServeUOAConfig(w http.ResponseWriter, _ *http.Request) {
-	if h.cfg.UOADomain == "" || h.cfg.UOARedirectURL == "" || h.cfg.UOAAudience == "" || h.cfg.UOASharedSecret == "" {
+	domain, err := uoaConfigDomain(h.cfg)
+	redirectURLs := uoaConfigRedirectURLs(*h)
+	if err != nil || strings.TrimSpace(h.cfg.UOAConfigURL) == "" || len(redirectURLs) == 0 || h.cfg.UOAAudience == "" || h.cfg.UOASharedSecret == "" {
 		http.Error(w, "uoa config is incomplete", http.StatusInternalServerError)
 		return
 	}
 
+	authMethods := []string{"email_password", "google", "apple"}
 	now := time.Now()
-	claims := uoaConfigClaims{
-		Domain:             h.cfg.UOADomain,
-		RedirectURLs:       []string{h.cfg.UOARedirectURL},
-		EnabledAuthMethods: []string{"email", "google", "apple"},
-		UserScope:          "global",
-		UITheme:            map[string]any{},
-		LanguageConfig:     "en",
-		RegisteredClaims: jwt.RegisteredClaims{
-			Audience:  jwt.ClaimStrings{h.cfg.UOAAudience},
-			Issuer:    h.cfg.UOADomain,
-			IssuedAt:  jwt.NewNumericDate(now),
-			ExpiresAt: jwt.NewNumericDate(now.Add(5 * time.Minute)),
+	claims := jwt.MapClaims{
+		"domain":                   domain,
+		"redirect_urls":            redirectURLs,
+		"enabled_auth_methods":     authMethods,
+		"allowed_social_providers": uoaAllowedSocialProviders(authMethods),
+		"user_scope":               "global",
+		"ui_theme":                 uoaDefaultTheme(),
+		"language_config":          "en",
+		"2fa_enabled":              false,
+		"debug_enabled":            false,
+		"allow_registration":       true,
+		"registration_mode":        "password_required",
+		"access_requests": map[string]any{
+			"enabled":          false,
+			"notify_org_roles": []string{"owner", "admin"},
 		},
+		"session": map[string]any{
+			"remember_me_enabled":           true,
+			"remember_me_default":           true,
+			"short_refresh_token_ttl_hours": 1,
+			"long_refresh_token_ttl_days":   30,
+		},
+		"org_features": map[string]any{
+			"enabled":                       true,
+			"groups_enabled":                false,
+			"user_needs_team":               true,
+			"max_teams_per_org":             100,
+			"max_groups_per_org":            20,
+			"max_members_per_org":           1000,
+			"max_members_per_team":          200,
+			"max_members_per_group":         500,
+			"max_team_memberships_per_user": 50,
+			"org_roles":                     []string{"owner", "admin", "member"},
+		},
+		"aud": h.cfg.UOAAudience,
+		"iat": now.Unix(),
+		"exp": now.Add(5 * time.Minute).Unix(),
 	}
 
 	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(h.cfg.UOASharedSecret))
@@ -46,6 +131,6 @@ func (h *CallbackHandler) ServeUOAConfig(w http.ResponseWriter, _ *http.Request)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/jwt")
+	w.Header().Set("Content-Type", "text/plain")
 	_, _ = w.Write([]byte(token))
 }
